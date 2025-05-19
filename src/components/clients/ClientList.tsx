@@ -1,131 +1,264 @@
-
-import React, { useState } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Client, ClientStatus } from '@/types';
-import { Edit, MoreVertical, Trash2, Send, UserPlus } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { toast } from 'sonner';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Edit, MoreVertical, Trash2, Send, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
+import supabase from '../../integrations/supabase/supabaseClient';
+import supabaseAdmin from '../../integrations/supabase/supabaseAdmin';
+import { Client, ClientStatus } from '@/types';
+import CustomPagination from '@/components/CustomPagination';
+import DeleteDialog from '../../components/DeleteDialog';
+import { debounce } from 'lodash';
 
-// Mock data for client list
-const mockClients: Client[] = [
-  {
-    id: '1',
-    name: 'Acme Corporation',
-    email: 'contact@acmecorp.com',
-    phone: '555-123-4567',
-    address: '123 Business St, Suite 100, Industry City, CA 94105',
-    status: 'active',
-    hasAccount: true,
-    notes: 'Long-standing client with multiple projects',
-    createdAt: new Date('2023-01-15'),
-    updatedAt: new Date('2023-05-20')
-  },
-  {
-    id: '2',
-    name: 'Globex Industries',
-    email: 'info@globexindustries.com',
-    phone: '555-987-6543',
-    address: '456 Enterprise Ave, Corporate Park, NY 10001',
-    status: 'idle',
-    hasAccount: false,
-    notes: 'New client, initial project completed',
-    createdAt: new Date('2023-03-10'),
-    updatedAt: new Date('2023-04-22')
-  },
-  {
-    id: '3',
-    name: 'Initech Solutions',
-    email: 'support@initechsolutions.com',
-    phone: '555-246-8135',
-    address: '789 Tech Blvd, Innovation District, TX 75001',
-    status: 'gone',
-    hasAccount: true,
-    notes: 'No response for over 3 months',
-    createdAt: new Date('2022-11-05'),
-    updatedAt: new Date('2023-02-15')
-  },
-];
+// Timeout utility
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+  const timeout = new Promise<T>((_, reject) => {
+    setTimeout(() => {
+      console.warn(`Operation timed out after ${timeoutMs}ms`);
+      reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } catch (error: any) {
+    console.error(`withTimeout error: ${error.message}`, error.stack);
+    throw error;
+  }
+};
 
 interface ClientListProps {
   onEdit: (clientId: string) => void;
 }
 
 const ClientList: React.FC<ClientListProps> = ({ onEdit }) => {
-  const [clients, setClients] = useState<Client[]>(mockClients);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
   const [createAccountDialogOpen, setCreateAccountDialogOpen] = useState(false);
   const [clientToCreateAccount, setClientToCreateAccount] = useState<Client | null>(null);
   const [password, setPassword] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Debounce setDeleteDialogOpen to prevent rapid state changes
+  const debouncedSetDeleteDialogOpen = useCallback(
+    debounce((open: boolean) => {
+      console.log(`Debounced setDeleteDialogOpen: ${open}`);
+      setDeleteDialogOpen(open);
+    }, 300),
+    []
+  );
+
+  useEffect(() => {
+    const fetchClients = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await withTimeout(
+          supabase.from('clients').select('*').order('created_at', { ascending: false }),
+          5000
+        );
+        if (error) throw new Error(`Failed to fetch clients: ${error.message}`);
+
+        const formatted = data.map((client: any) => ({
+          id: client.id,
+          name: client.name,
+          email: client.email,
+          phone: client.phone,
+          address: client.address,
+          status: client.status as ClientStatus,
+          hasAccount: client.has_account,
+          notes: client.notes,
+          createdAt: new Date(client.created_at),
+          updatedAt: new Date(client.updated_at),
+        }));
+
+        setClients(formatted);
+        console.log('Clients from Supabase:', formatted);
+      } catch (err: any) {
+        console.error('Error fetching clients:', err.message, err.stack);
+        setError(err.message || 'Failed to load clients');
+        toast.error(err.message || 'Failed to load clients');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClients();
+  }, []);
 
   const getStatusColor = (status: ClientStatus) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 hover:bg-green-200';
-      case 'idle': return 'bg-amber-100 text-amber-800 hover:bg-amber-200';
-      case 'gone': return 'bg-red-100 text-red-800 hover:bg-red-200';
-      default: return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
-    }
+    const colorMap: Record<ClientStatus, string> = {
+      idle: 'bg-amber-100 text-amber-800 hover:bg-amber-200',
+      gone: 'bg-red-100 text-red-800 hover:bg-red-200',
+    };
+    return colorMap[status] || 'bg-gray-100 text-gray-800 hover:bg-gray-200';
   };
 
   const getRowColor = (status: ClientStatus) => {
-    switch (status) {
-      case 'active': return 'border-l-4 border-l-green-500';
-      case 'idle': return 'border-l-4 border-l-amber-500';
-      case 'gone': return 'border-l-4 border-l-red-500';
-      default: return '';
+    const colorMap: Record<ClientStatus, string> = {
+      active: 'border-l-4 border-l-green-500',
+      gone: 'border-l-4 border-l-red-500',
+    };
+    return colorMap[status] || '';
+  };
+
+  const confirmDelete = (id: string) => {
+    console.log('Opening delete dialog for client:', id);
+    setClientToDelete(id);
+    debouncedSetDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!clientToDelete) {
+      console.warn('handleDelete called with no clientToDelete');
+      debouncedSetDeleteDialogOpen(false);
+      return;
     }
-  };
-
-  const handleStatusChange = (clientId: string, newStatus: ClientStatus) => {
-    setClients(clients.map(client => 
-      client.id === clientId ? { ...client, status: newStatus } : client
-    ));
-    toast.success(`Client status updated to ${newStatus}`);
-  };
-
-  const confirmDelete = (clientId: string) => {
-    setClientToDelete(clientId);
-    setDeleteDialogOpen(true);
-  };
-  
-  const handleDelete = () => {
-    if (clientToDelete) {
-      setClients(clients.filter(client => client.id !== clientToDelete));
+    setIsProcessing(true);
+    try {
+      console.log('Deleting client:', clientToDelete);
+      const { error } = await withTimeout(
+        supabase.from('clients').delete().eq('id', clientToDelete),
+        5000
+      );
+      if (error) throw new Error(`Failed to delete client: ${error.message}`);
+      setClients(clients.filter(c => c.id !== clientToDelete));
       toast.success('Client deleted successfully');
-      setDeleteDialogOpen(false);
+      debouncedSetDeleteDialogOpen(false);
       setClientToDelete(null);
+    } catch (err: any) {
+      console.error('Error deleting client:', err.message, err.stack);
+      toast.error(err.message || 'Failed to delete client');
+      debouncedSetDeleteDialogOpen(false);
+      setClientToDelete(null);
+    } finally {
+      setIsProcessing(false);
+      console.log('Delete operation completed for client');
     }
   };
+
+  const generateRandomPassword = (length = 10) => {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
+  useEffect(() => {
+    if (createAccountDialogOpen) {
+      setPassword(generateRandomPassword());
+    }
+  }, [createAccountDialogOpen]);
 
   const openCreateAccountDialog = (client: Client) => {
     setClientToCreateAccount(client);
     setCreateAccountDialogOpen(true);
   };
 
-  const handleCreateAccount = () => {
-    if (clientToCreateAccount) {
-      // In a real application, this would create an account and send credentials
-      setClients(clients.map(client => 
-        client.id === clientToCreateAccount.id ? { ...client, hasAccount: true } : client
-      ));
-      toast.success(`Account credentials sent to ${clientToCreateAccount.email}`);
+  const handleCreateAccount = async () => {
+    if (!clientToCreateAccount || !password) return;
+
+    setIsProcessing(true);
+    try {
+      const { data: user, error: signUpError } = await supabase.auth.admin.createUser({
+        email: clientToCreateAccount.email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          role: 'client',
+          name: clientToCreateAccount.name,
+          client_id: clientToCreateAccount.id,
+        },
+      });
+
+      if (signUpError) throw new Error(`Signup error: ${signUpError.message}`);
+
+      const { error: updateError } = await supabase
+        .from('clients')
+        .update({ has_account: true })
+        .eq('id', clientToCreateAccount.id);
+
+      if (updateError) throw new Error(`Update error: ${updateError.message}`);
+
+      toast.success('Account created and credentials sent');
+      setClients(prev =>
+        prev.map(c =>
+          c.id === clientToCreateAccount.id ? { ...c, hasAccount: true } : c
+        )
+      );
       setCreateAccountDialogOpen(false);
-      setClientToCreateAccount(null);
       setPassword('');
+    } catch (err: any) {
+      console.error('Account creation error:', err.message, err.stack);
+      toast.error(err.message || 'Failed to create account');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleSendCredentials = (clientId: string) => {
-    const client = clients.find(c => c.id === clientId);
-    if (client) {
-      toast.success(`Credentials resent to ${client.email}`);
-    }
+  const handleSendCredentials = async (id: string) => {
+    // Implement if needed
   };
+
+  // Paginate clients
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedClients = clients.slice(startIndex, endIndex);
+
+  if (loading) {
+    return (
+      <div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead><Skeleton className="h-6 w-24" /></TableHead>
+              <TableHead><Skeleton className="h-6 w-32" /></TableHead>
+              <TableHead><Skeleton className="h-6 w-24" /></TableHead>
+              <TableHead><Skeleton className="h-6 w-20" /></TableHead>
+              <TableHead><Skeleton className="h-6 w-24" /></TableHead>
+              <TableHead className="text-right"><Skeleton className="h-6 w-16 ml-auto" /></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {[...Array(rowsPerPage)].map((_, index) => (
+              <TableRow key={index}>
+                <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                <TableCell className="text-right"><Skeleton className="h-4 w-[40px] ml-auto" /></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <CustomPagination
+          totalItems={0}
+          rowsPerPage={rowsPerPage}
+          setRowsPerPage={setRowsPerPage}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -141,124 +274,141 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit }) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {clients.map((client) => (
-            <TableRow key={client.id} className={getRowColor(client.status)}>
-              <TableCell className="font-medium">{client.name}</TableCell>
-              <TableCell>{client.email}</TableCell>
-              <TableCell>{client.phone}</TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className={`rounded-full px-2.5 text-xs font-semibold ${getStatusColor(client.status)}`}>
-                      {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={() => handleStatusChange(client.id, 'active')}>
-                      <Badge variant="outline" className={getStatusColor('active')}>Active</Badge>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleStatusChange(client.id, 'idle')}>
-                      <Badge variant="outline" className={getStatusColor('idle')}>Idle</Badge>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleStatusChange(client.id, 'gone')}>
-                      <Badge variant="outline" className={getStatusColor('gone')}>Gone</Badge>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-              <TableCell>
-                {client.hasAccount ? (
-                  <Badge variant="outline" className="bg-blue-100 text-blue-800">
-                    Has Account
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="bg-gray-100 text-gray-800">
-                    No Account
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onEdit(client.id)}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    {client.hasAccount ? (
-                      <DropdownMenuItem onClick={() => handleSendCredentials(client.id)}>
-                        <Send className="mr-2 h-4 w-4" />
-                        Resend Credentials
-                      </DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem onClick={() => openCreateAccountDialog(client)}>
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Create Account
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem className="text-destructive" onClick={() => confirmDelete(client.id)}>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+          {error ? (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center text-red-600">
+                <p>{error}</p>
+                <Button onClick={() => window.location.reload()} className="mt-4">Retry</Button>
               </TableCell>
             </TableRow>
-          ))}
+          ) : paginatedClients.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                No clients found.
+              </TableCell>
+            </TableRow>
+          ) : (
+            paginatedClients.map((client) => (
+              <TableRow key={client.id} className={getRowColor(client.status)}>
+                <TableCell className="font-medium">{client.name}</TableCell>
+                <TableCell>{client.email}</TableCell>
+                <TableCell>{client.phone}</TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className={`rounded-full px-2.5 text-xs font-semibold ${getStatusColor(client.status)}`}
+                        disabled={isProcessing}
+                      >
+                        {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </DropdownMenu>
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant="outline"
+                    className={client.hasAccount ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}
+                  >
+                    {client.hasAccount ? 'Has Account' : 'No Account'}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" disabled={isProcessing}>
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onEdit(client.id)} disabled={isProcessing}>
+                        <Edit className="mr-2 h-4 w-4" /> Edit
+                      </DropdownMenuItem>
+                      {client.hasAccount ? (
+                        <DropdownMenuItem onClick={() => handleSendCredentials(client.id)} disabled={isProcessing}>
+                          <Send className="mr-2 h-4 w-4" /> Resend Credentials
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem onClick={() => openCreateAccountDialog(client)} disabled={isProcessing}>
+                          <UserPlus className="mr-2 h-4 w-4" /> Create Account
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
+                        onClick={() => confirmDelete(client.id)}
+                        className="text-destructive"
+                        disabled={isProcessing}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Deletion</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this client? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Account Dialog */}
-      <Dialog open={createAccountDialogOpen} onOpenChange={setCreateAccountDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Client Account</DialogTitle>
-            <DialogDescription>
-              Create a new account for {clientToCreateAccount?.name}. An email with login details will be sent to {clientToCreateAccount?.email}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid w-full items-center gap-1.5">
-              <label htmlFor="username" className="text-sm font-medium">Username</label>
-              <Input type="text" id="username" value={clientToCreateAccount?.email || ''} disabled />
+      <CustomPagination
+        totalItems={clients.length}
+        rowsPerPage={rowsPerPage}
+        setRowsPerPage={setRowsPerPage}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+      />
+      <DeleteDialog
+        open={deleteDialogOpen}
+        onOpenChange={debouncedSetDeleteDialogOpen}
+        onDelete={handleDelete}
+        entityName="client"
+        isProcessing={isProcessing}
+      />
+      {createAccountDialogOpen && (
+        <Dialog open={createAccountDialogOpen} onOpenChange={setCreateAccountDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Client Account</DialogTitle>
+              <DialogDescription>
+                Create an account for <strong>{clientToCreateAccount?.name}</strong>. Credentials will be emailed to <strong>{clientToCreateAccount?.email}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium" htmlFor="username">Email</label>
+                <Input id="username" value={clientToCreateAccount?.email || ''} disabled />
+              </div>
+              <div className="relative">
+                <label className="text-sm font-medium" htmlFor="password">Password</label>
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Temporary password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isProcessing}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-[38px] text-gray-500 hover:text-gray-800"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
-            <div className="grid w-full items-center gap-1.5">
-              <label htmlFor="password" className="text-sm font-medium">Password</label>
-              <Input 
-                type="password" 
-                id="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter temporary password" 
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateAccountDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateAccount} disabled={!password}>Create & Send</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreateAccountDialogOpen(false)} disabled={isProcessing}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateAccount} disabled={!password || isProcessing}>
+                Create & Send
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

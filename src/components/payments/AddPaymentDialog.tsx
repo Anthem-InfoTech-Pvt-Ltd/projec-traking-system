@@ -1,87 +1,39 @@
-
-import React, { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogDescription, DialogFooter
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Payment, PaymentStatus } from '@/types';
-import { toast } from 'sonner';
-import * as z from 'zod';
-import { useForm } from 'react-hook-form';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import {
+  Form, FormControl, FormField, FormItem,
+  FormLabel, FormMessage
+} from '@/components/ui/form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+import {
+  Select, SelectContent, SelectItem,
+  SelectTrigger, SelectValue
+} from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Popover, PopoverContent, PopoverTrigger
+} from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { PaymentStatus } from '@/types';
 
-// Mock data for payment being edited
-const mockPayments: Record<string, Payment> = {
-  '1': {
-    id: '1',
-    taskId: '101',
-    clientId: '1',
-    amount: 2500.00,
-    status: 'due',
-    dueDate: new Date('2023-06-30'),
-    createdAt: new Date('2023-05-15'),
-    updatedAt: new Date('2023-05-15')
-  },
-  '2': {
-    id: '2',
-    taskId: '102',
-    clientId: '2',
-    amount: 1800.00,
-    status: 'invoiced',
-    dueDate: new Date('2023-07-15'),
-    invoiceNumber: 'INV-2023-002',
-    invoicedAt: new Date('2023-06-01'),
-    createdAt: new Date('2023-05-20'),
-    updatedAt: new Date('2023-06-01')
-  },
-  '3': {
-    id: '3',
-    taskId: '103',
-    clientId: '1',
-    amount: 3200.00,
-    status: 'received',
-    dueDate: new Date('2023-05-15'),
-    invoiceNumber: 'INV-2023-001',
-    invoicedAt: new Date('2023-04-15'),
-    receivedAt: new Date('2023-05-10'),
-    createdAt: new Date('2023-04-01'),
-    updatedAt: new Date('2023-05-10')
-  }
-};
-
-// Mock data for clients and tasks
-const mockClients = [
-  { id: '1', name: 'Acme Corporation' },
-  { id: '2', name: 'Globex Industries' },
-  { id: '3', name: 'Initech Solutions' },
-];
-
-const mockTasks = [
-  { id: '101', title: 'Website Redesign' },
-  { id: '102', title: 'Mobile App Development' },
-  { id: '103', title: 'SEO Optimization' },
-  { id: '104', title: 'Brand Identity Update' },
-  { id: '105', title: 'Content Marketing Campaign' },
-  { id: '106', title: 'Email Newsletter Design' },
-];
-
-// Form schema for payment
 const paymentSchema = z.object({
   clientId: z.string().min(1, 'Client is required'),
   taskId: z.string().min(1, 'Task is required'),
   amount: z.coerce.number().positive('Amount must be positive'),
   status: z.enum(['due', 'invoiced', 'pending', 'received', 'overdue', 'canceled']),
-  dueDate: z.date({
-    required_error: "Due date is required",
-  }),
+  dueDate: z.date({ required_error: "Due date is required" }),
   invoiceNumber: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -97,58 +49,163 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
   open,
   onOpenChange,
   paymentId,
-  onPaymentSaved,
+  onPaymentSaved
 }) => {
-  const isEditing = !!paymentId;
-  
+  const isEditing = paymentId !== null;
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [tasks, setTasks] = useState<{ id: string; title: string }[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+
   const form = useForm<z.infer<typeof paymentSchema>>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
       clientId: '',
       taskId: '',
       amount: 0,
-      status: 'due' as PaymentStatus,
+      status: 'due',
       dueDate: new Date(),
       invoiceNumber: '',
       notes: '',
-    }
+    },
   });
 
-  useEffect(() => {
-    if (paymentId && mockPayments[paymentId]) {
-      const payment = mockPayments[paymentId];
-      form.reset({
-        clientId: payment.clientId,
-        taskId: payment.taskId,
-        amount: payment.amount,
-        status: payment.status,
-        dueDate: payment.dueDate,
-        invoiceNumber: payment.invoiceNumber || '',
-        notes: payment.notes || '',
-      });
-    } else {
-      form.reset({
-        clientId: '',
-        taskId: '',
-        amount: 0,
-        status: 'due',
-        dueDate: new Date(),
-        invoiceNumber: '',
-        notes: '',
-      });
-    }
-  }, [paymentId, form]);
+  const selectedClientId = form.watch('clientId');
 
-  function onSubmit(values: z.infer<typeof paymentSchema>) {
-    // In a real app, this would communicate with an API
-    console.log("Form values:", values);
-    
-    setTimeout(() => {
+  const fetchClients = useCallback(async () => {
+    setIsLoadingClients(true);
+    const isMounted = { current: true };
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      if (isMounted.current) setClients(data ?? []);
+    } catch (err) {
+      toast.error('Failed to load clients');
+      console.error(err);
+    } finally {
+      if (isMounted.current) setIsLoadingClients(false);
+    }
+    return () => { isMounted.current = false; };
+  }, []);
+
+  const fetchTasks = useCallback(async (clientId: string) => {
+    if (!clientId) return;
+    setIsLoadingTasks(true);
+    const isMounted = { current: true };
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('id, title')
+        .eq('client_id', clientId)
+        .order('title', { ascending: true });
+      if (error) throw error;
+      if (isMounted.current) {
+        setTasks(data ?? []);
+        const currentTaskId = form.getValues('taskId');
+        if (isEditing && currentTaskId && !data?.some(t => t.id === currentTaskId)) {
+          form.setValue('taskId', '');
+          toast.error('Selected task is invalid for this client');
+        }
+      }
+    } catch (err) {
+      toast.error('Failed to load tasks');
+      console.error(err);
+    } finally {
+      if (isMounted.current) setIsLoadingTasks(false);
+    }
+    return () => { isMounted.current = false; };
+  }, [form, isEditing]);
+
+  const fetchPayment = useCallback(async () => {
+    if (!paymentId) return;
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('id', paymentId)
+        .single();
+      if (error) throw error;
+  
+      if (data) {
+        form.reset({
+          clientId: data.client_id,
+          amount: data.amount,
+          status: data.status,
+          dueDate: new Date(data.due_date),
+          invoiceNumber: data.invoice_number || '',
+          notes: data.notes || '',
+        });
+  
+        // 🔥 Important: wait for task list before setting taskId
+        await fetchTasks(data.client_id);
+        form.setValue('taskId', data.task_id);
+      }
+    } catch (err) {
+      toast.error('Failed to load payment');
+      console.error(err);
+    }
+  }, [form, paymentId, fetchTasks]);  
+
+  useEffect(() => {
+    if (open) {
+      fetchClients();
+      if (isEditing) fetchPayment();
+    } else {
+      form.reset();
+    }
+  }, [open, fetchClients, fetchPayment, isEditing, form]);
+
+  useEffect(() => {
+    if (open && selectedClientId) {
+      fetchTasks(selectedClientId);
+    } else {
+      setTasks([]);
+      if (!isEditing) {
+        form.setValue('taskId', '');
+      }
+    }
+  }, [open, selectedClientId, fetchTasks, form, isEditing]);
+
+  const onSubmit = async (values: z.infer<typeof paymentSchema>) => {
+    try {
+      const payload = {
+        client_id: values.clientId,
+        task_id: values.taskId,
+        amount: values.amount,
+        status: values.status,
+        due_date: values.dueDate.toISOString(),
+        invoice_number: values.invoiceNumber,
+        notes: values.notes,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (isEditing) {
+        const { error } = await supabase
+          .from('payments')
+          .update(payload)
+          .eq('id', paymentId);
+        if (error) throw error;
+      } else {
+        payload['created_at'] = new Date().toISOString();
+        const { error } = await supabase
+          .from('payments')
+          .insert([payload]);
+        if (error) throw error;
+      }
+
       toast.success(isEditing ? 'Payment updated successfully' : 'Payment added successfully');
       onOpenChange(false);
       onPaymentSaved();
-    }, 500);
-  }
+    } catch (err) {
+      toast.error('Failed to save payment');
+      console.error(err);
+    }
+  };
+
+  if (!open) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -156,34 +213,33 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Payment' : 'Add New Payment'}</DialogTitle>
           <DialogDescription>
-            {isEditing 
-              ? 'Update the payment information below.' 
-              : 'Fill in the payment information to create a new record.'}
+            {isEditing ? 'Update the payment information below.' : 'Fill in the payment information to create a new record.'}
           </DialogDescription>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Client Select */}
               <FormField
                 control={form.control}
                 name="clientId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Client</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
+                    <Select
+                      onValueChange={field.onChange}
                       value={field.value}
+                      disabled={isLoadingClients || isEditing}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select client" />
+                          <SelectValue placeholder={isLoadingClients ? 'Loading...' : 'Select client'} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockClients.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                        {clients.map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -192,25 +248,36 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
                 )}
               />
 
+              {/* Task Select */}
               <FormField
                 control={form.control}
                 name="taskId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Task</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
+                    <Select
+                      onValueChange={field.onChange}
                       value={field.value}
+                      disabled={isLoadingTasks || !selectedClientId}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select task" />
+                          <SelectValue
+                            placeholder={
+                              isLoadingTasks
+                                ? 'Loading...'
+                                : !selectedClientId
+                                  ? 'Select a client first'
+                                  : tasks.length === 0
+                                    ? 'No tasks available'
+                                    : 'Select task'
+                            }
+                          />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockTasks.map((task) => (
-                          <SelectItem key={task.id} value={task.id}>{task.title}</SelectItem>
+                        {tasks.map(t => (
+                          <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -219,43 +286,40 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
                 )}
               />
 
+              {/* Amount */}
               <FormField
                 control={form.control}
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Amount ($)</FormLabel>
+                    <FormLabel>Amount</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="0.00" {...field} />
+                      <Input type="number" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              {/* Status */}
               <FormField
                 control={form.control}
                 name="status"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                      value={field.value}
-                    >
+                    <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="due">Due</SelectItem>
-                        <SelectItem value="invoiced">Invoiced</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="received">Received</SelectItem>
-                        <SelectItem value="overdue">Overdue</SelectItem>
-                        <SelectItem value="canceled">Canceled</SelectItem>
+                        {['due', 'invoiced', 'pending', 'received', 'overdue', 'canceled'].map(status => (
+                          <SelectItem key={status} value={status}>
+                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -263,6 +327,7 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
                 )}
               />
 
+              {/* Due Date */}
               <FormField
                 control={form.control}
                 name="dueDate"
@@ -272,18 +337,8 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
+                          <Button variant="outline" className={cn('w-full text-left font-normal', !field.value && 'text-muted-foreground')}>
+                            {field.value ? format(field.value, 'PPP') : 'Pick a date'}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
@@ -293,7 +348,7 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
-                          disabled={(date) => date < new Date("1900-01-01")}
+                          disabled={date => date < new Date('1900-01-01')}
                           initialFocus
                         />
                       </PopoverContent>
@@ -303,6 +358,7 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
                 )}
               />
 
+              {/* Invoice Number */}
               <FormField
                 control={form.control}
                 name="invoiceNumber"
@@ -310,7 +366,7 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
                   <FormItem>
                     <FormLabel>Invoice Number</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. INV-2023-001" {...field} />
+                      <Input placeholder="e.g. INV-2024-001" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -318,6 +374,7 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
               />
             </div>
 
+            {/* Notes */}
             <FormField
               control={form.control}
               name="notes"
@@ -325,18 +382,19 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Additional notes about this payment" {...field} />
+                    <Textarea placeholder="Any notes related to the payment..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {/* Footer */}
             <DialogFooter>
-              <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button type="submit" disabled={form.formState.isSubmitting}>
                 {isEditing ? 'Update Payment' : 'Add Payment'}
               </Button>
             </DialogFooter>

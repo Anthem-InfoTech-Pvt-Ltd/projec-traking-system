@@ -15,37 +15,6 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
-// Mock data for development/fallback
-const mockTasks: Task[] = [
-  {
-    id: "task-1",
-    title: "Website Redesign",
-    clientId: "client-1",
-    description: "Complete redesign of the client's e-commerce website with new branding",
-    status: "requirements",
-    estimatedHours: 40,
-    estimatedCost: 4000,
-    project: "E-commerce Refresh",
-    createdAt: new Date(2025, 4, 1),
-    updatedAt: new Date(2025, 4, 1),
-    dueDate: new Date(2025, 4, 15)
-  },
-  {
-    id: "task-2",
-    title: "Mobile App Development",
-    clientId: "client-2",
-    description: "Create a native mobile app for iOS and Android platforms",
-    status: "quote",
-    estimatedHours: 120,
-    estimatedCost: 12000,
-    project: "Mobile Initiative",
-    createdAt: new Date(2025, 4, 2),
-    updatedAt: new Date(2025, 4, 2),
-    dueDate: new Date(2025, 5, 15)
-  },
-  // ... other mock tasks
-];
-
 const TasksPage: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -59,12 +28,17 @@ const TasksPage: React.FC = () => {
       try {
         setIsLoading(true);
         
-        const { data, error } = await supabase
-          .from('tasks')
-          .select('*');
+        let query = supabase.from('tasks').select('*');
+        
+        // If user is not admin, filter tasks by client ID
+        if (user?.role !== 'admin') {
+          query = query.eq('client_id', user.app_metadata.clientId);
+        }
+        
+        const { data, error } = await query;
         
         if (error) {
-          throw error;
+          throw new Error('Failed to fetch tasks');
         }
         
         // Transform the data to match our Task interface
@@ -86,29 +60,23 @@ const TasksPage: React.FC = () => {
         }));
         
         setTasks(formattedTasks);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching tasks:', error);
         toast({
           title: "Error",
           description: "Failed to load tasks. Please try again.",
           variant: "destructive",
         });
-        
-        // Use mock data as fallback for development
-        setTasks(mockTasks);
       } finally {
         setIsLoading(false);
       }
     };
     
     fetchTasks();
-  }, []);
+  }, [user]);
   
   const handleAddTask = async (newTask: Task) => {
     try {
-      // For development, use both Supabase and local state
-      // In production, you'd only use Supabase
-      
       // Transform task to match Supabase schema
       const supabaseTask = {
         id: newTask.id,
@@ -120,6 +88,8 @@ const TasksPage: React.FC = () => {
         estimated_cost: newTask.estimatedCost,
         project: newTask.project,
         due_date: newTask.dueDate?.toISOString(),
+        created_at: newTask.createdAt.toISOString(),
+        updated_at: newTask.updatedAt.toISOString(),
       };
       
       // Insert task into Supabase
@@ -132,29 +102,15 @@ const TasksPage: React.FC = () => {
       // Add to local state
       setTasks([...tasks, newTask]);
       
-      // Send notification to client
-      await fetch('http://localhost:5000/api/task-notification', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ taskId: newTask.id, eventType: 'created' })
-      });
-      
       toast({
         title: "Task created",
         description: "The task has been created successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding task:', error);
-      
-      // Fallback for development - just update the state
-      setTasks([...tasks, newTask]);
-      
       toast({
-        title: "Warning",
-        description: "Task added locally but failed to sync with the server.",
+        title: "Error",
+        description: "Failed to create task. Please try again.",
         variant: "destructive",
       });
     }
@@ -173,7 +129,7 @@ const TasksPage: React.FC = () => {
         project: updatedTask.project,
         due_date: updatedTask.dueDate?.toISOString(),
         completed_at: updatedTask.completedAt?.toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
       
       // Update task in Supabase
@@ -188,30 +144,15 @@ const TasksPage: React.FC = () => {
       setTasks(tasks.map(task => task.id === updatedTask.id ? updatedTask : task));
       setTaskToEdit(null);
       
-      // If task was marked as complete, send notification
-      if (updatedTask.status === 'complete' && updatedTask.completedAt) {
-        await supabase.functions.invoke('send-task-notification', {
-          body: {
-            taskId: updatedTask.id,
-            eventType: 'completed'
-          }
-        });
-      }
-      
       toast({
         title: "Task updated",
         description: "The task has been updated successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating task:', error);
-      
-      // Fallback for development - just update the state
-      setTasks(tasks.map(task => task.id === updatedTask.id ? updatedTask : task));
-      setTaskToEdit(null);
-      
       toast({
-        title: "Warning",
-        description: "Task updated locally but failed to sync with the server.",
+        title: "Error",
+        description: "Failed to update task. Please try again.",
         variant: "destructive",
       });
     }
@@ -234,15 +175,11 @@ const TasksPage: React.FC = () => {
         title: "Task deleted",
         description: "The task has been deleted successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting task:', error);
-      
-      // Fallback for development - just update the state
-      setTasks(tasks.filter(task => task.id !== taskId));
-      
       toast({
-        title: "Warning",
-        description: "Task deleted locally but failed to sync with the server.",
+        title: "Error",
+        description: "Failed to delete task. Please try again.",
         variant: "destructive",
       });
     }
@@ -267,8 +204,13 @@ const TasksPage: React.FC = () => {
       };
       
       await handleUpdateTask(updatedTask);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating task status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update task status. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -281,7 +223,6 @@ const TasksPage: React.FC = () => {
             <Filter className="mr-2 h-4 w-4" />
             Filter
           </Button>
-          {/* Only show Add Task button for admins */}
           {user?.role === 'admin' && (
             <Button onClick={() => {setTaskToEdit(null); setIsAddDialogOpen(true);}}>
               <Plus className="mr-2 h-4 w-4" />
@@ -303,7 +244,11 @@ const TasksPage: React.FC = () => {
         <CardContent>
           {isLoading ? (
             <div className="flex justify-center items-center p-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-anthem-purple"></div>
+              {/* <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-anthem-purple"></div> */}
+            </div>
+          ) : tasks.length === 0 ? (
+            <div className="text-center p-8">
+              <p className="text-gray-500">No tasks found.</p>
             </div>
           ) : (
             <TaskList 

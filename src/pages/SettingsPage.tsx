@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,9 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Bell, Moon, Settings, User } from 'lucide-react';
+import { Bell, Moon, Settings, User, Eye, EyeOff } from 'lucide-react';
+
 
 const SettingsPage: React.FC = () => {
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+const [showNewPassword, setShowNewPassword] = useState(false);
+const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const { user } = useAuth();
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -96,20 +101,70 @@ const SettingsPage: React.FC = () => {
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Password</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="current-password">Current Password</Label>
-                      <Input id="current-password" type="password" />
-                    </div>
-                    <div></div>
-                    <div className="space-y-2">
-                      <Label htmlFor="new-password">New Password</Label>
-                      <Input id="new-password" type="password" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirm-password">Confirm New Password</Label>
-                      <Input id="confirm-password" type="password" />
-                    </div>
-                  </div>
+  {/* Current Password */}
+  <div className="space-y-2">
+    <Label htmlFor="current-password">Current Password</Label>
+    <div className="relative">
+      <Input
+        id="current-password"
+        type={showCurrentPassword ? 'text' : 'password'}
+        className="pr-10"
+      />
+      <button
+        type="button"
+        onClick={() => setShowCurrentPassword((prev) => !prev)}
+        className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground"
+        tabIndex={-1}
+      >
+        {showCurrentPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+      </button>
+    </div>
+  </div>
+
+  {/* Spacer for alignment (can be removed or used as needed) */}
+  <div></div>
+
+  {/* New Password */}
+  <div className="space-y-2">
+    <Label htmlFor="new-password">New Password</Label>
+    <div className="relative">
+      <Input
+        id="new-password"
+        type={showNewPassword ? 'text' : 'password'}
+        className="pr-10"
+      />
+      <button
+        type="button"
+        onClick={() => setShowNewPassword((prev) => !prev)}
+        className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground"
+        tabIndex={-1}
+      >
+        {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+      </button>
+    </div>
+  </div>
+
+  {/* Confirm New Password */}
+  <div className="space-y-2">
+    <Label htmlFor="confirm-password">Confirm New Password</Label>
+    <div className="relative">
+      <Input
+        id="confirm-password"
+        type={showConfirmPassword ? 'text' : 'password'}
+        className="pr-10"
+      />
+      <button
+        type="button"
+        onClick={() => setShowConfirmPassword((prev) => !prev)}
+        className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground"
+        tabIndex={-1}
+      >
+        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+      </button>
+    </div>
+  </div>
+</div>
+
                 </div>
               </form>
             </CardContent>

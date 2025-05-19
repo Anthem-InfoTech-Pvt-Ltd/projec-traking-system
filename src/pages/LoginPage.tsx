@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Eye, EyeOff } from 'lucide-react'; // Import icons at the top
 
 const LoginPage: React.FC = () => {
   const { isAuthenticated, login, isLoading } = useAuth();
@@ -16,6 +17,7 @@ const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{email?: string; password?: string}>({});
+  const [showPassword, setShowPassword] = useState(false);
   
   // If already authenticated, redirect to dashboard
   if (isAuthenticated) {
@@ -91,28 +93,40 @@ const LoginPage: React.FC = () => {
               {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Button
-                  variant="link"
-                  className="p-0 h-auto text-sm"
-                  onClick={() => navigate('/forgot-password')}
-                  type="button"
-                >
-                  Forgot password?
-                </Button>
-              </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="********"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
-                aria-invalid={!!errors.password}
-              />
-              {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
-            </div>
+  <div className="flex items-center justify-between">
+    <Label htmlFor="password">Password</Label>
+    <Button
+      variant="link"
+      className="p-0 h-auto text-sm"
+      onClick={() => navigate('/forgot-password')}
+      type="button"
+    >
+      Forgot password?
+    </Button>
+  </div>
+  <div className="relative">
+    <Input
+      id="password"
+      type={showPassword ? 'text' : 'password'}
+      placeholder="********"
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+      disabled={isLoading}
+      aria-invalid={!!errors.password}
+      className="pr-10"
+    />
+    <button
+      type="button"
+      onClick={() => setShowPassword((prev) => !prev)}
+      className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-muted-foreground"
+      tabIndex={-1}
+    >
+      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+    </button>
+  </div>
+  {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
+</div>
+
             <Button
               type="submit"
               className="w-full bg-anthem-purple hover:bg-anthem-darkPurple"
