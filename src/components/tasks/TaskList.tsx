@@ -34,7 +34,8 @@ const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T
 interface TaskListProps {
   tasks: Task[];
   onEdit?: (task: Task) => void;
-  onDelete?: (taskId: string) => Promise<void> | void;
+  onDelete?: (taskId: string) => Promise<void>;
+  onStatusChange?: (taskId: string, newStatus: TaskStatus) => Promise<void>;
 }
 
 // Skeleton component for TaskList
@@ -69,7 +70,7 @@ const TaskListSkeleton: React.FC<{ rowsPerPage: number }> = ({ rowsPerPage }) =>
   );
 };
 
-const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete }) => {
+const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, onStatusChange }) => {
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -98,6 +99,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete }) => {
         );
         if (error) throw new Error(`Failed to fetch clients: ${error.message}`);
         setClients(data || []);
+        console.log('Fetched clients:', data);
       } catch (error: any) {
         console.error('Error fetching clients:', error.message, error.stack);
         toast.error(error.message || 'Failed to fetch clients');
@@ -129,18 +131,19 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete }) => {
     setIsProcessing(true);
     try {
       console.log('Deleting task:', taskToDelete);
-      await withTimeout(Promise.resolve(onDelete(taskToDelete)), 5000);
-      toast.success('Task deleted successfully');
+      await withTimeout(onDelete(taskToDelete), 5000);
+      console.log('Delete operation successful for task:', taskToDelete);
+      // Success toast is handled in TasksPage.tsx
       debouncedSetDeleteDialogOpen(false);
       setTaskToDelete(null);
     } catch (error: any) {
       console.error('Error deleting task:', error.message, error.stack);
-      toast.error(error.message || 'Failed to delete task');
+      // Error toast is handled in TasksPage.tsx
       debouncedSetDeleteDialogOpen(false);
       setTaskToDelete(null);
     } finally {
       setIsProcessing(false);
-      console.log('Delete operation completed for task');
+      console.log('Delete operation completed for task:', taskToDelete);
     }
   };
 
@@ -217,7 +220,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete }) => {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  {(onEdit || onDelete) && (
+                  {(onEdit || onDelete || onStatusChange) && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" disabled={isProcessing}>

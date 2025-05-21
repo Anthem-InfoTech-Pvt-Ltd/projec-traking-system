@@ -70,6 +70,7 @@ const TasksPage: React.FC = () => {
       const { data, error } = await query;
       
       if (error) {
+        console.error('Supabase fetch tasks error:', error);
         throw new Error('Failed to fetch tasks: ' + error.message);
       }
       
@@ -83,7 +84,8 @@ const TasksPage: React.FC = () => {
         estimatedCost: task.estimated_cost,
         actualHours: task.actual_hours,
         actualCost: task.actual_cost,
-        project: task.project,
+        project: task.project_Link, // Updated to match schema
+        notes: task.notes, // Added to match schema
         createdAt: new Date(task.created_at),
         updatedAt: new Date(task.updated_at),
         dueDate: task.due_date ? new Date(task.due_date) : undefined,
@@ -130,8 +132,9 @@ const TasksPage: React.FC = () => {
               estimatedHours: payload.new.estimated_hours,
               estimatedCost: payload.new.estimated_cost,
               actualHours: payload.new.actual_hours,
-              actualCost: payload.new.actual_cost,
-              project: payload.new.project,
+              actualCost: task.actual_cost,
+              project: task.project_Link, // Updated to match schema
+              notes: task.notes, // Added to match schema
               createdAt: new Date(payload.new.created_at),
               updatedAt: new Date(payload.new.updated_at),
               dueDate: payload.new.due_date ? new Date(payload.new.due_date) : undefined,
@@ -160,8 +163,9 @@ const TasksPage: React.FC = () => {
               estimatedHours: payload.new.estimated_hours,
               estimatedCost: payload.new.estimated_cost,
               actualHours: payload.new.actual_hours,
-              actualCost: payload.new.actual_cost,
-              project: payload.new.project,
+              actualCost: task.actual_cost,
+              project: task.project_Link, // Updated to match schema
+              notes: task.notes, // Added to match schema
               createdAt: new Date(payload.new.created_at),
               updatedAt: new Date(payload.new.updated_at),
               dueDate: payload.new.due_date ? new Date(payload.new.due_date) : undefined,
@@ -226,7 +230,8 @@ const TasksPage: React.FC = () => {
         status: newTask.status,
         estimated_hours: newTask.estimatedHours,
         estimated_cost: newTask.estimatedCost,
-        project: newTask.project,
+        project_Link: newTask.project, // Updated to match schema
+        notes: newTask.notes, // Added to match schema
         due_date: newTask.dueDate?.toISOString(),
         created_at: newTask.createdAt.toISOString(),
         updated_at: newTask.updatedAt.toISOString(),
@@ -236,7 +241,10 @@ const TasksPage: React.FC = () => {
         .from('tasks')
         .insert([supabaseTask]);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase insert task error:', error);
+        throw error;
+      }
       
       toast({
         title: "Task created",
@@ -246,7 +254,7 @@ const TasksPage: React.FC = () => {
       console.error('Error adding task:', error);
       toast({
         title: "Error",
-        description: "Failed to create task. Please try again.",
+        description: "Failed to create task: " + error.message,
         variant: "destructive",
       });
     }
@@ -261,7 +269,8 @@ const TasksPage: React.FC = () => {
         status: updatedTask.status,
         estimated_hours: updatedTask.estimatedHours,
         estimated_cost: updatedTask.estimatedCost,
-        project: updatedTask.project,
+        project_Link: updatedTask.project, // Updated to match schema
+        notes: updatedTask.notes, // Added to match schema
         due_date: updatedTask.dueDate?.toISOString(),
         completed_at: updatedTask.completedAt?.toISOString(),
         updated_at: new Date().toISOString(),
@@ -272,7 +281,10 @@ const TasksPage: React.FC = () => {
         .update(supabaseTask)
         .eq('id', updatedTask.id);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase update task error:', error);
+        throw error;
+      }
       
       setTaskToEdit(null);
       
@@ -284,7 +296,7 @@ const TasksPage: React.FC = () => {
       console.error('Error updating task:', error);
       toast({
         title: "Error",
-        description: "Failed to update task. Please try again.",
+        description: "Failed to update task: " + error.message,
         variant: "destructive",
       });
     }
@@ -292,13 +304,19 @@ const TasksPage: React.FC = () => {
   
   const handleDeleteTask = async (taskId: string) => {
     try {
+      console.log('Attempting to delete task with ID:', taskId);
       const { error } = await supabase
         .from('tasks')
         .delete()
         .eq('id', taskId);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase delete task error:', error);
+        throw new Error('Failed to delete task: ' + error.message);
+      }
       
+      console.log('Task deleted successfully from database:', taskId);
+      // Real-time subscription will handle state update
       toast({
         title: "Task deleted",
         description: "The task has been deleted successfully.",
@@ -307,9 +325,10 @@ const TasksPage: React.FC = () => {
       console.error('Error deleting task:', error);
       toast({
         title: "Error",
-        description: "Failed to delete task. Please try again.",
+        description: "Failed to delete task: " + error.message,
         variant: "destructive",
       });
+      throw error; // Re-throw to ensure TaskList.tsx catches it
     }
   };
   
@@ -322,7 +341,10 @@ const TasksPage: React.FC = () => {
     try {
       const taskToUpdate = tasks.find(task => task.id === taskId);
       
-      if (!taskToUpdate) return;
+      if (!taskToUpdate) {
+        console.error('Task not found for status update:', taskId);
+        return;
+      }
       
       const updatedTask = {
         ...taskToUpdate,
@@ -336,7 +358,7 @@ const TasksPage: React.FC = () => {
       console.error('Error updating task status:', error);
       toast({
         title: "Error",
-        description: "Failed to update task status. Please try again.",
+        description: "Failed to update task status: " + error.message,
         variant: "destructive",
       });
     }
