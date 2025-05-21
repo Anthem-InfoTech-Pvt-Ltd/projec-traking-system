@@ -17,7 +17,7 @@ const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const clientId = user?.app_metadata?.clientId;
-
+console.log('User:', user);
   // Timeout utility
   const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
     const timeout = new Promise<T>((_, reject) => {

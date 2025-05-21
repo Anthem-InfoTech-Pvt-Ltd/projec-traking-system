@@ -34,7 +34,7 @@ const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T
 interface TaskListProps {
   tasks: Task[];
   onEdit?: (task: Task) => void;
-  onDelete?: (taskId: string) => Promise<void> | void; // Updated to allow async
+  onDelete?: (taskId: string) => Promise<void> | void;
 }
 
 // Skeleton component for TaskList
@@ -129,7 +129,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete }) => {
     setIsProcessing(true);
     try {
       console.log('Deleting task:', taskToDelete);
-      await withTimeout(Promise.resolve(onDelete(taskToDelete)), 5000); // Wrap onDelete in timeout
+      await withTimeout(Promise.resolve(onDelete(taskToDelete)), 5000);
       toast.success('Task deleted successfully');
       debouncedSetDeleteDialogOpen(false);
       setTaskToDelete(null);
@@ -167,7 +167,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete }) => {
   const endIndex = startIndex + rowsPerPage;
   const paginatedTasks = tasks.slice(startIndex, endIndex);
 
-  if (isLoadingClients || tasks.length === 0) {
+  if (isLoadingClients) {
     return (
       <div>
         <TaskListSkeleton rowsPerPage={rowsPerPage} />
@@ -197,43 +197,51 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete }) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {paginatedTasks.map((task) => (
-            <TableRow key={task.id}>
-              <TableCell className="font-medium">{task.title}</TableCell>
-              <TableCell>{getClientName(task.clientId)}</TableCell>
-              <TableCell>{task.dueDate ? format(task.dueDate, 'PPP') : '-'}</TableCell>
-              <TableCell>{task.estimatedHours}</TableCell>
-              <TableCell>${task.estimatedCost}</TableCell>
-              <TableCell>
-                <Badge variant="outline" className={getStatusColor(task.status)}>
-                  {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-right">
-                {(onEdit || onDelete) && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" disabled={isProcessing}>
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {onEdit && (
-                        <DropdownMenuItem onClick={() => onEdit(task)}>
-                          <Edit className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                      )}
-                      {onDelete && (
-                        <DropdownMenuItem onClick={() => confirmDelete(task.id)} className="text-destructive">
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+          {paginatedTasks.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                No tasks match the current filters.
               </TableCell>
             </TableRow>
-          ))}
+          ) : (
+            paginatedTasks.map((task) => (
+              <TableRow key={task.id}>
+                <TableCell className="font-medium">{task.title}</TableCell>
+                <TableCell>{getClientName(task.clientId)}</TableCell>
+                <TableCell>{task.dueDate ? format(task.dueDate, 'PPP') : '-'}</TableCell>
+                <TableCell>{task.estimatedHours}</TableCell>
+                <TableCell>${task.estimatedCost}</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className={getStatusColor(task.status)}>
+                    {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  {(onEdit || onDelete) && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" disabled={isProcessing}>
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {onEdit && (
+                          <DropdownMenuItem onClick={() => onEdit(task)}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                        )}
+                        {onDelete && (
+                          <DropdownMenuItem onClick={() => confirmDelete(task.id)} className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
       <CustomPagination

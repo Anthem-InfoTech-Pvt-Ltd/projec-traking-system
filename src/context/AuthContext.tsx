@@ -19,142 +19,142 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize auth state and listen for changes
-  useEffect(() => {
-    const initializeAuth = async () => {
-      const token = Cookies.get('auth_token');
-      if (token) {
-        try {
-          const response = await fetch(`http://localhost:5000/api/users/me`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            },
-            credentials: 'include'
-          });
-          if (response.ok) {
-            const backendUser = await response.json();
-            setUser({
-              id: backendUser.id,
-              email: backendUser.email,
-              name: backendUser.name,
-              role: backendUser.role as UserRole,
-              clientId: backendUser.clientId,
-              phone: backendUser.phone,
-              avatar_url: backendUser.avatar_url,
-              notification_preferences: backendUser.notification_preferences,
-              appearance_settings: backendUser.appearance_settings,
-              createdAt: new Date(backendUser.created_at),
-              updatedAt: new Date(backendUser.updated_at),
-              lastLogin: backendUser.last_login ? new Date(backendUser.last_login) : undefined
-            });
-            console.log("user:", backendUser);
-          } else {
-            Cookies.remove('auth_token');
-          }
-        } catch (error) {
-          console.error('Failed to fetch user data:', error);
-          Cookies.remove('auth_token');
-        }
-      }
-      setIsLoading(false);
-    };
+useEffect(() => {
+  const initializeAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
 
-    initializeAuth();
+    if (!session) {
+      // थोड़ा delay दो ताकि Supabase session restore कर सके
+      const { data: newSession } = await new Promise((resolve) =>
+        setTimeout(async () => resolve(await supabase.auth.getSession()), 500)
+      );
 
-    // Listen for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const token = Cookies.get('auth_token');
-        if (token) {
-          try {
-            const response = await fetch(`http://localhost:5000/api/users/me`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-              },
-              credentials: 'include'
-            });
-            if (response.ok) {
-              const backendUser = await response.json();
-              setUser({
-                id: backendUser.id,
-                email: backendUser.email,
-                name: backendUser.name,
-                role: backendUser.role as UserRole,
-                clientId: backendUser.clientId,
-                phone: backendUser.phone,
-                avatar_url: backendUser.avatar_url,
-                notification_preferences: backendUser.notification_preferences,
-                appearance_settings: backendUser.appearance_settings,
-                createdAt: new Date(backendUser.created_at),
-                updatedAt: new Date(backendUser.updated_at),
-                lastLogin: backendUser.last_login ? new Date(backendUser.last_login) : undefined
-              });
-            } else {
-              Cookies.remove('auth_token');
-            }
-          } catch (error) {
-            console.error('Failed to fetch user data on sign-in:', error);
-            Cookies.remove('auth_token');
-          }
-        }
-      } else if (event === 'SIGNED_OUT') {
+      if (!newSession?.session) {
         setUser(null);
-        Cookies.remove('auth_token');
+        setIsLoading(false);
+        return;
       }
-      setIsLoading(false);
-    });
+    }
 
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
+    const token = session?.access_token || newSession?.session?.access_token;
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/me`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const backendUser = await response.json();
+        setUser({
+          id: backendUser._id,
+          email: backendUser.email,
+          name: backendUser.name,
+          role: backendUser.role,
+        });
+      } else {
+        console.warn('Invalid session, logging out.');
+        await supabase.auth.signOut();
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Error during session validation:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  initializeAuth();
+
+  const { data: listener } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.access_token) {
+        const token = session.access_token;
+
+        const response = await fetch(`http://localhost:5000/api/users/me`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const backendUser = await response.json();
+          setUser({
+            id: backendUser.id,
+            email: backendUser.email,
+            name: backendUser.name,
+            role: backendUser.role as UserRole,
+            clientId: backendUser.clientId,
+            phone: backendUser.phone,
+            avatar_url: backendUser.avatar_url,
+            notification_preferences: backendUser.notification_preferences,
+            appearance_settings: backendUser.appearance_settings,
+            createdAt: new Date(backendUser.created_at),
+            updatedAt: new Date(backendUser.updated_at),
+            lastLogin: backendUser.last_login ? new Date(backendUser.last_login) : undefined
+          });
+        }
+      }
+
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+    }
+  );
+
+  return () => {
+    listener.subscription.unsubscribe();
+  };
+}, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
       if (!email || !password) throw new Error('Email and password are required');
-      console.log('Sending login request:', { email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-      const response = await fetch(`http://localhost:5000/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
+      if (error) {
+        console.error('Supabase login error:', error.message);
+        throw new Error(
+          error.message.includes('Email not confirmed')
+            ? 'Email not confirmed. Please check your email.'
+            : 'Invalid email or password.'
+        );
       }
 
-      const { user: backendUser, session, token } = await response.json();
-      await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token
-      });
+      const session = data.session;
+      const accessToken = session?.access_token;
 
-      // Set JWT in cookie
-      Cookies.set('auth_token', token, {
-        expires: 1 / 24, 
-      });
+      const userId = data.user.id;
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('Failed to fetch user profile');
+      }
 
       setUser({
-        id: backendUser.id,
-        email: backendUser.email,
-        name: backendUser.name,
-        role: backendUser.role as UserRole,
-        clientId: backendUser.clientId,
-        phone: backendUser.phone,
-        avatar_url: backendUser.avatar_url,
-        notification_preferences: backendUser.notification_preferences,
-        appearance_settings: backendUser.appearance_settings,
-        createdAt: new Date(backendUser.created_at),
-        updatedAt: new Date(backendUser.updated_at),
-        lastLogin: backendUser.last_login ? new Date(backendUser.last_login) : undefined
+        id: userData.id,
+        email: userData.email,
+        name: userData.name,
+        role: userData.role as UserRole,
+        clientId: userData.client_id,
+        phone: userData.phone,
+        avatar_url: userData.avatar_url,
+        notification_preferences: userData.notification_preferences,
+        appearance_settings: userData.appearance_settings,
+        createdAt: new Date(userData.created_at),
+        updatedAt: new Date(userData.updated_at),
+        lastLogin: userData.last_login ? new Date(userData.last_login) : undefined
       });
     } catch (error) {
       console.error('Login failed:', error);
@@ -167,23 +167,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     setIsLoading(true);
     try {
-      const token = Cookies.get('auth_token');
-      const response = await fetch(`http://localhost:5000/api/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Logout failed');
-      }
-
       await supabase.auth.signOut();
-      Cookies.remove('auth_token');
       setUser(null);
     } catch (error) {
       console.error('Logout failed:', error);

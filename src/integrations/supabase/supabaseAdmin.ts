@@ -1,11 +1,27 @@
-// lib/supabaseAdmin.ts
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = "https://kihyynlvajbjpmplmhij.supabase.co";
-const SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpaHl5bmx2YWpianBtcGxtaGlqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzA0MzUxOSwiZXhwIjoyMDYyNjE5NTE5fQ.sWQSy2iEdJcfajhFBvuwdfjeFVrZRxCLyWtCXZuBVJ0";
+const SUPABASE_URL =import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY =import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
-export const supabaseAdmin = createClient<Database>(
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY
-);
+// Singleton instance
+let supabaseAdminInstance: SupabaseClient | null = null;
+
+export function getSupabaseAdminClient(): SupabaseClient {
+  if (!supabaseAdminInstance) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Supabase URL and Service Role Key must be defined in environment variables');
+    }
+    supabaseAdminInstance = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+    console.log('Supabase admin client initialized');
+  }
+  return supabaseAdminInstance;
+}
+
+// Export the singleton instance for direct use
+const supabaseAdmin = getSupabaseAdminClient();
+export default supabaseAdmin;

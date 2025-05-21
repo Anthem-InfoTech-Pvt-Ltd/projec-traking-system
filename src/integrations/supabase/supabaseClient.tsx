@@ -1,9 +1,28 @@
-// src/integrations/supabase/supabaseClient.ts
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = "https://kihyynlvajbjpmplmhij.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpaHl5bmx2YWpianBtcGxtaGlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcwNDM1MTksImV4cCI6MjA2MjYxOTUxOX0.mPSQ6r16uuhIVVu7DRioK3AmUFP9z73pXvvR3f6uVgk";
+const SUPABASE_URL =import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY =import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Singleton instance
+let supabaseInstance: SupabaseClient | null = null;
 
+export function getSupabaseClient(): SupabaseClient {
+  if (!supabaseInstance) {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      throw new Error('Supabase URL and Anon Key must be defined in environment variables');
+    }
+    supabaseInstance = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        storageKey: 'supabase.auth.token',
+      },
+    });
+    console.log('Supabase client initialized');
+  }
+  return supabaseInstance;
+}
+
+// Export the singleton instance for direct use
+const supabase = getSupabaseClient();
 export default supabase;

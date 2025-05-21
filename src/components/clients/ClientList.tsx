@@ -105,14 +105,16 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit }) => {
     const colorMap: Record<ClientStatus, string> = {
       idle: 'bg-amber-100 text-amber-800 hover:bg-amber-200',
       gone: 'bg-red-100 text-red-800 hover:bg-red-200',
+      active: 'bg-green-100 text-green-800 hover:bg-green-200',
     };
     return colorMap[status] || 'bg-gray-100 text-gray-800 hover:bg-gray-200';
   };
 
   const getRowColor = (status: ClientStatus) => {
     const colorMap: Record<ClientStatus, string> = {
-      active: 'border-l-4 border-l-green-500',
+      idle: 'border-l-4 border-l-amber-500',
       gone: 'border-l-4 border-l-red-500',
+      active: 'border-l-4 border-l-green-500',
     };
     return colorMap[status] || '';
   };
@@ -173,49 +175,67 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit }) => {
   };
 
   const handleCreateAccount = async () => {
-    if (!clientToCreateAccount || !password) return;
+  if (!clientToCreateAccount || !password) return;
 
-    setIsProcessing(true);
-    try {
-      const { data: user, error: signUpError } = await supabase.auth.admin.createUser({
+  setIsProcessing(true);
+  try {
+    const response = await fetch('http://localhost:5000/api/client/resend-credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         email: clientToCreateAccount.email,
         password,
-        email_confirm: true,
-        user_metadata: {
-          role: 'client',
-          name: clientToCreateAccount.name,
-          client_id: clientToCreateAccount.id,
-        },
-      });
+        name: clientToCreateAccount.name,
+        client_id: clientToCreateAccount.id,
+      }),
+    });
 
-      if (signUpError) throw new Error(`Signup error: ${signUpError.message}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Failed to create account');
 
-      const { error: updateError } = await supabase
-        .from('clients')
-        .update({ has_account: true })
-        .eq('id', clientToCreateAccount.id);
+    toast.success('Account created and credentials sent');
+    setClients(prev =>
+      prev.map(c =>
+        c.id === clientToCreateAccount.id ? { ...c, hasAccount: true } : c
+      )
+    );
+    setCreateAccountDialogOpen(false);
+    setPassword('');
+  } catch (err: any) {
+    console.error('Account creation error:', err.message);
+    toast.error(err.message || 'Failed to create account');
+  } finally {
+    setIsProcessing(false);
+  }
+};
+const handleResendCredentials = async (client) => {
+  if (!client.email) {
+    toast.error('Email is missing');
+    return;
+  }
 
-      if (updateError) throw new Error(`Update error: ${updateError.message}`);
+  setIsProcessing(true);
+  try {
+    const response = await fetch('http://localhost:5000/api/client/resend-credentials-only', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: client.email,
+        name: client.name,
+      }),
+    });
 
-      toast.success('Account created and credentials sent');
-      setClients(prev =>
-        prev.map(c =>
-          c.id === clientToCreateAccount.id ? { ...c, hasAccount: true } : c
-        )
-      );
-      setCreateAccountDialogOpen(false);
-      setPassword('');
-    } catch (err: any) {
-      console.error('Account creation error:', err.message, err.stack);
-      toast.error(err.message || 'Failed to create account');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Failed to resend credentials');
 
-  const handleSendCredentials = async (id: string) => {
-    // Implement if needed
-  };
+    toast.success('Credentials resent successfully');
+  } catch (err) {
+    console.error('Error resending credentials:', err.message);
+    toast.error(err.message || 'Failed to resend credentials');
+  } finally {
+    setIsProcessing(false);
+  }
+};
 
   // Paginate clients
   const startIndex = (currentPage - 1) * rowsPerPage;
@@ -326,14 +346,21 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit }) => {
                         <Edit className="mr-2 h-4 w-4" /> Edit
                       </DropdownMenuItem>
                       {client.hasAccount ? (
-                        <DropdownMenuItem onClick={() => handleSendCredentials(client.id)} disabled={isProcessing}>
-                          <Send className="mr-2 h-4 w-4" /> Resend Credentials
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem onClick={() => openCreateAccountDialog(client)} disabled={isProcessing}>
-                          <UserPlus className="mr-2 h-4 w-4" /> Create Account
-                        </DropdownMenuItem>
-                      )}
+  <DropdownMenuItem
+    onClick={() => handleResendCredentials(client)}
+    disabled={isProcessing}
+  >
+    <Send className="mr-2 h-4 w-4" /> Resend Credentials
+  </DropdownMenuItem>
+) : (
+  <DropdownMenuItem
+    onClick={() => openCreateAccountDialog(client)}
+    disabled={isProcessing}
+  >
+    <UserPlus className="mr-2 h-4 w-4" /> Create Account
+  </DropdownMenuItem>
+)}
+
                       <DropdownMenuItem
                         onClick={() => confirmDelete(client.id)}
                         className="text-destructive"

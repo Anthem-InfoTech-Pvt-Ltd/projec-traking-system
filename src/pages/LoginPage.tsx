@@ -10,10 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Eye, EyeOff } from 'lucide-react'; // Import icons at the top
 
 const LoginPage: React.FC = () => {
-  const { isAuthenticated, login, isLoading } = useAuth();
+  const { isAuthenticated, login, isLoading, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  
+  console.log('User:', user);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{email?: string; password?: string}>({});

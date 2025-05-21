@@ -388,24 +388,6 @@ const PaymentList: React.FC<PaymentListProps> = ({ onEdit }) => {
                           {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(payment.id)} disabled={isProcessing}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => generateInvoice(payment.id)} disabled={isProcessing}>
-                          <FileText className="mr-2 h-4 w-4" />
-                          Generate Invoice
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => confirmDelete(payment.id)}
-                          disabled={isProcessing}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
                     </DropdownMenu>
                   ) : (
                     <Badge className={`${getStatusColor(payment.status)}`}>

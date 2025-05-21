@@ -6,11 +6,13 @@ import { useAuth } from '@/context/AuthContext';
 
 const UnauthorizedPage: React.FC = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user, isAuthenticated } = useAuth();
   
   const handleBackToDashboard = () => {
     navigate('/dashboard');
   };
+  console.log('User:', user);
+  console.log('Is Authenticated:', isAuthenticated);
   
   const handleLogout = () => {
     logout();

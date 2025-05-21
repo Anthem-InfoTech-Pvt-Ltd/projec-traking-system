@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -10,74 +10,214 @@ import { Button } from '@/components/ui/button';
 import { Plus, Filter } from 'lucide-react';
 import TaskList from '@/components/tasks/TaskList';
 import AddTaskDialog from '@/components/tasks/AddTaskDialog';
+import TaskFilterDialog from '@/components/tasks/TaskFilterDialog';
 import { Task, TaskStatus } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
+interface TaskFilter {
+  statuses: TaskStatus[];
+  clientId: string | null;
+  dueDateStart: Date | null;
+  dueDateEnd: Date | null;
+}
+
 const TasksPage: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [filters, setFilters] = useState<TaskFilter>({
+    statuses: [],
+    clientId: null,
+    dueDateStart: null,
+    dueDateEnd: null,
+  });
   const { user } = useAuth();
   
-  // Fetch tasks from Supabase
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        setIsLoading(true);
-        
-        let query = supabase.from('tasks').select('*');
-        
-        // If user is not admin, filter tasks by client ID
-        if (user?.role !== 'admin') {
-          query = query.eq('client_id', user.app_metadata.clientId);
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) {
-          throw new Error('Failed to fetch tasks');
-        }
-        
-        // Transform the data to match our Task interface
-        const formattedTasks: Task[] = data.map((task: any) => ({
-          id: task.id,
-          title: task.title,
-          clientId: task.client_id,
-          description: task.description,
-          status: task.status,
-          estimatedHours: task.estimated_hours,
-          estimatedCost: task.estimated_cost,
-          actualHours: task.actual_hours,
-          actualCost: task.actual_cost,
-          project: task.project,
-          createdAt: new Date(task.created_at),
-          updatedAt: new Date(task.updated_at),
-          dueDate: task.due_date ? new Date(task.due_date) : undefined,
-          completedAt: task.completed_at ? new Date(task.completed_at) : undefined,
-        }));
-        
-        setTasks(formattedTasks);
-      } catch (error: any) {
-        console.error('Error fetching tasks:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load tasks. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
+  const fetchTasks = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      let query = supabase.from('tasks').select('*');
+      
+      console.log('Applying filters to query:', filters);
+      if (user?.role !== 'admin') {
+        query = query.eq('client_id', user.app_metadata.clientId);
+        console.log('Non-admin filter applied: client_id =', user.app_metadata.clientId);
+      } else if (filters.clientId) {
+        query = query.eq('client_id', filters.clientId);
+        console.log('Client filter applied: client_id =', filters.clientId);
       }
-    };
-    
+      
+      if (filters.statuses.length > 0) {
+        query = query.in('status', filters.statuses);
+        console.log('Status filter applied:', filters.statuses);
+      }
+      
+      if (filters.dueDateStart) {
+        query = query.gte('due_date', filters.dueDateStart.toISOString());
+        console.log('Due date start filter applied:', filters.dueDateStart.toISOString());
+      }
+      if (filters.dueDateEnd) {
+        query = query.lte('due_date', filters.dueDateEnd.toISOString());
+        console.log('Due date end filter applied:', filters.dueDateEnd.toISOString());
+      }
+      
+      query = query.order('created_at', { ascending: false });
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        throw new Error('Failed to fetch tasks: ' + error.message);
+      }
+      
+      const formattedTasks: Task[] = data.map((task: any) => ({
+        id: task.id,
+        title: task.title,
+        clientId: task.client_id,
+        description: task.description,
+        status: task.status,
+        estimatedHours: task.estimated_hours,
+        estimatedCost: task.estimated_cost,
+        actualHours: task.actual_hours,
+        actualCost: task.actual_cost,
+        project: task.project,
+        createdAt: new Date(task.created_at),
+        updatedAt: new Date(task.updated_at),
+        dueDate: task.due_date ? new Date(task.due_date) : undefined,
+        completedAt: task.completed_at ? new Date(task.completed_at) : undefined,
+      }));
+      
+      console.log('Fetched tasks:', formattedTasks);
+      setTasks(formattedTasks);
+    } catch (error: any) {
+      console.error('Error fetching tasks:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load tasks. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, filters]);
+
+  useEffect(() => {
     fetchTasks();
-  }, [user]);
-  
+  }, [fetchTasks]);
+
+  useEffect(() => {
+    const subscription = supabase
+      .channel('tasks_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+        },
+        (payload) => {
+          console.log('Real-time task event:', payload);
+          if (payload.eventType === 'INSERT') {
+            const newTask: Task = {
+              id: payload.new.id,
+              title: payload.new.title,
+              clientId: payload.new.client_id,
+              description: payload.new.description,
+              status: payload.new.status,
+              estimatedHours: payload.new.estimated_hours,
+              estimatedCost: payload.new.estimated_cost,
+              actualHours: payload.new.actual_hours,
+              actualCost: payload.new.actual_cost,
+              project: payload.new.project,
+              createdAt: new Date(payload.new.created_at),
+              updatedAt: new Date(payload.new.updated_at),
+              dueDate: payload.new.due_date ? new Date(payload.new.due_date) : undefined,
+              completedAt: payload.new.completed_at ? new Date(payload.new.completed_at) : undefined,
+            };
+            const matchesFilters =
+              (!filters.statuses.length || filters.statuses.includes(newTask.status)) &&
+              (!filters.clientId || newTask.clientId === filters.clientId) &&
+              (!filters.dueDateStart || (newTask.dueDate && newTask.dueDate >= filters.dueDateStart)) &&
+              (!filters.dueDateEnd || (newTask.dueDate && newTask.dueDate <= filters.dueDateEnd)) &&
+              (user?.role !== 'admin' ? newTask.clientId === user?.app_metadata.clientId : true);
+            if (matchesFilters) {
+              setTasks((prev) => {
+                const updated = [newTask, ...prev.filter((t) => t.id !== newTask.id)];
+                console.log('Added new task to state:', updated);
+                return updated;
+              });
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedTask: Task = {
+              id: payload.new.id,
+              title: payload.new.title,
+              clientId: payload.new.client_id,
+              description: payload.new.description,
+              status: payload.new.status,
+              estimatedHours: payload.new.estimated_hours,
+              estimatedCost: payload.new.estimated_cost,
+              actualHours: payload.new.actual_hours,
+              actualCost: payload.new.actual_cost,
+              project: payload.new.project,
+              createdAt: new Date(payload.new.created_at),
+              updatedAt: new Date(payload.new.updated_at),
+              dueDate: payload.new.due_date ? new Date(payload.new.due_date) : undefined,
+              completedAt: payload.new.completed_at ? new Date(payload.new.completed_at) : undefined,
+            };
+            const matchesFilters =
+              (!filters.statuses.length || filters.statuses.includes(updatedTask.status)) &&
+              (!filters.clientId || updatedTask.clientId === filters.clientId) &&
+              (!filters.dueDateStart || (updatedTask.dueDate && updatedTask.dueDate >= filters.dueDateStart)) &&
+              (!filters.dueDateEnd || (updatedTask.dueDate && updatedTask.dueDate <= filters.dueDateEnd)) &&
+              (user?.role !== 'admin' ? updatedTask.clientId === user?.app_metadata.clientId : true);
+            setTasks((prev) => {
+              const exists = prev.some((t) => t.id === updatedTask.id);
+              if (matchesFilters) {
+                const updated = exists
+                  ? prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
+                  : [updatedTask, ...prev];
+                console.log('Updated task in state:', updated);
+                return updated;
+              } else if (exists) {
+                const updated = prev.filter((t) => t.id !== updatedTask.id);
+                console.log('Removed updated task from state (no longer matches filters):', updated);
+                return updated;
+              }
+              return prev;
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setTasks((prev) => {
+              const updated = prev.filter((t) => t.id !== payload.old.id);
+              console.log('Deleted task from state:', updated);
+              return updated;
+            });
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Subscribed to tasks table changes');
+        } else if (err) {
+          console.error('Subscription error:', err);
+          toast({
+            title: "Error",
+            description: "Failed to subscribe to task updates",
+            variant: "destructive",
+          });
+        }
+      });
+
+    return () => {
+      console.log('Unsubscribing from tasks table changes');
+      supabase.removeChannel(subscription);
+    };
+  }, [filters, user]);
+
   const handleAddTask = async (newTask: Task) => {
     try {
-      // Transform task to match Supabase schema
       const supabaseTask = {
         id: newTask.id,
         title: newTask.title,
@@ -92,15 +232,11 @@ const TasksPage: React.FC = () => {
         updated_at: newTask.updatedAt.toISOString(),
       };
       
-      // Insert task into Supabase
       const { error } = await supabase
         .from('tasks')
         .insert([supabaseTask]);
       
       if (error) throw error;
-      
-      // Add to local state
-      setTasks([...tasks, newTask]);
       
       toast({
         title: "Task created",
@@ -118,7 +254,6 @@ const TasksPage: React.FC = () => {
   
   const handleUpdateTask = async (updatedTask: Task) => {
     try {
-      // Transform task to match Supabase schema
       const supabaseTask = {
         title: updatedTask.title,
         client_id: updatedTask.clientId,
@@ -132,7 +267,6 @@ const TasksPage: React.FC = () => {
         updated_at: new Date().toISOString(),
       };
       
-      // Update task in Supabase
       const { error } = await supabase
         .from('tasks')
         .update(supabaseTask)
@@ -140,8 +274,6 @@ const TasksPage: React.FC = () => {
       
       if (error) throw error;
       
-      // Update local state
-      setTasks(tasks.map(task => task.id === updatedTask.id ? updatedTask : task));
       setTaskToEdit(null);
       
       toast({
@@ -160,16 +292,12 @@ const TasksPage: React.FC = () => {
   
   const handleDeleteTask = async (taskId: string) => {
     try {
-      // Delete task from Supabase
       const { error } = await supabase
         .from('tasks')
         .delete()
         .eq('id', taskId);
       
       if (error) throw error;
-      
-      // Update local state
-      setTasks(tasks.filter(task => task.id !== taskId));
       
       toast({
         title: "Task deleted",
@@ -214,12 +342,17 @@ const TasksPage: React.FC = () => {
     }
   };
 
+  const handleApplyFilters = (newFilters: TaskFilter) => {
+    console.log('New filters applied:', newFilters);
+    setFilters(newFilters);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
         <div className="flex space-x-2">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => setIsFilterDialogOpen(true)}>
             <Filter className="mr-2 h-4 w-4" />
             Filter
           </Button>
@@ -244,7 +377,7 @@ const TasksPage: React.FC = () => {
         <CardContent>
           {isLoading ? (
             <div className="flex justify-center items-center p-8">
-              {/* <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-anthem-purple"></div> */}
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
           ) : tasks.length === 0 ? (
             <div className="text-center p-8">
@@ -270,6 +403,13 @@ const TasksPage: React.FC = () => {
           taskToEdit={taskToEdit}
         />
       )}
+      
+      <TaskFilterDialog
+        isOpen={isFilterDialogOpen}
+        onClose={() => setIsFilterDialogOpen(false)}
+        onApply={handleApplyFilters}
+        isAdmin={user?.role === 'admin'}
+      />
     </div>
   );
 };
