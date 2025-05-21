@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Edit, MoreVertical, Trash2, Send, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
-import supabase from '../../integrations/supabase/supabaseClient';
+import {supabase} from '../../integrations/supabase/client';
 import supabaseAdmin from '../../integrations/supabase/supabaseAdmin';
 import { Client, ClientStatus } from '@/types';
 import CustomPagination from '@/components/CustomPagination';

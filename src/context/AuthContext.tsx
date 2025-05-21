@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, UserRole } from '@/types';
-import Cookies from 'js-cookie';
+// import Cookies from 'js-cookie';
 
 interface AuthContextType {
   user: User | null;
@@ -19,99 +19,56 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-useEffect(() => {
-  const initializeAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+ useEffect(() => {
+    // Handles new sessions or rehydrated sessions
+    const handleSession = async (session: any) => {
+      if (session?.user) {
+        const userId = session.user.id;
 
-    if (!session) {
-      // थोड़ा delay दो ताकि Supabase session restore कर सके
-      const { data: newSession } = await new Promise((resolve) =>
-        setTimeout(async () => resolve(await supabase.auth.getSession()), 500)
-      );
+        const { data: backendUser, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .in('role', ['admin', 'client'])
+          .single();
 
-      if (!newSession?.session) {
-        setUser(null);
-        setIsLoading(false);
-        return;
-      }
-    }
-
-    const token = session?.access_token || newSession?.session?.access_token;
-    try {
-      const response = await fetch(`http://localhost:5000/api/users/me`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const backendUser = await response.json();
-        setUser({
-          id: backendUser._id,
-          email: backendUser.email,
-          name: backendUser.name,
-          role: backendUser.role,
-        });
-      } else {
-        console.warn('Invalid session, logging out.');
-        await supabase.auth.signOut();
-        setUser(null);
-      }
-    } catch (error) {
-      console.error('Error during session validation:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  initializeAuth();
-
-  const { data: listener } = supabase.auth.onAuthStateChange(
-    async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.access_token) {
-        const token = session.access_token;
-
-        const response = await fetch(`http://localhost:5000/api/users/me`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          credentials: 'include',
-        });
-
-        if (response.ok) {
-          const backendUser = await response.json();
-          setUser({
+        if (!error && backendUser) {
+          const userObject = {
             id: backendUser.id,
             email: backendUser.email,
             name: backendUser.name,
-            role: backendUser.role as UserRole,
-            clientId: backendUser.clientId,
-            phone: backendUser.phone,
-            avatar_url: backendUser.avatar_url,
-            notification_preferences: backendUser.notification_preferences,
-            appearance_settings: backendUser.appearance_settings,
-            createdAt: new Date(backendUser.created_at),
-            updatedAt: new Date(backendUser.updated_at),
-            lastLogin: backendUser.last_login ? new Date(backendUser.last_login) : undefined
-          });
+            role: backendUser.role,
+          };
+          setUser(userObject);
+          localStorage.setItem('user', JSON.stringify(userObject));
+        } else {
+          console.error('Error fetching user profile:', error);
+          await supabase.auth.signOut();
+          setUser(null);
+          localStorage.removeItem('user');
         }
-      }
-
-      if (event === 'SIGNED_OUT') {
+      } else {
         setUser(null);
+        localStorage.removeItem('user');
       }
-    }
-  );
 
-  return () => {
-    listener.subscription.unsubscribe();
-  };
-}, []);
+      setIsLoading(false);
+    };
+
+    // Listen for auth changes
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleSession(session);
+    });
+
+    // On first load, fetch the session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleSession(session);
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -225,15 +182,15 @@ useEffect(() => {
   };    
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      isAuthenticated: !!user,
-      isLoading,
-      login,
-      logout,
-      forgotPassword,
-      resetPassword
-    }}>
+    <AuthContext.Provider  value={{
+        user,
+        isAuthenticated: !!user,
+        isLoading,
+        login,
+        logout,
+        forgotPassword,
+        resetPassword,
+      }}>
       {children}
     </AuthContext.Provider>
   );
