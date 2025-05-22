@@ -1,32 +1,62 @@
-import React, { useImperativeHandle, forwardRef } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import React, { useImperativeHandle, forwardRef } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
 import {
-  Popover, PopoverContent, PopoverTrigger,
-} from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { TaskStatus } from '@/types';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { TaskStatus } from "@/types";
+import SimpleDatePicker from "../ui/CustomCalendar";
 
 const taskFormSchema = z.object({
-  title: z.string().min(3, { message: 'Title must be at least 3 characters' }).max(100),
-  clientId: z.string().min(1, { message: 'Please select a client' }),
-  description: z.string().min(10, { message: 'Description must be at least 10 characters' }).max(500),
-  status: z.enum(['requirements', 'quote', 'approved', 'progress', 'submitted', 'feedback', 'complete'] as const),
-  estimatedHours: z.coerce.number().positive({ message: 'Hours must be positive' }),
-  estimatedCost: z.coerce.number().positive({ message: 'Cost must be positive' }),
+  title: z
+    .string()
+    .min(3, { message: "Title must be at least 3 characters" })
+    .max(100),
+  clientId: z.string().min(1, { message: "Please select a client" }),
+  description: z
+    .string()
+    .min(10, { message: "Description must be at least 10 characters" })
+    .max(500),
+  status: z.enum([
+    "requirements",
+    "quote",
+    "approved",
+    "progress",
+    "submitted",
+    "feedback",
+    "complete",
+  ] as const),
+  estimatedHours: z.coerce
+    .number()
+    .positive({ message: "Hours must be positive" }),
+  estimatedCost: z.coerce
+    .number()
+    .positive({ message: "Cost must be positive" }),
   project_link: z.string().optional(),
   dueDate: z.date().nullable().optional(),
 });
@@ -49,13 +79,13 @@ const TaskForm = forwardRef<TaskFormRef, TaskFormProps>(
     {
       onSubmit,
       defaultValues = {
-        title: '',
-        clientId: '',
-        description: '',
-        status: 'requirements',
+        title: "",
+        clientId: "",
+        description: "",
+        status: "requirements",
         estimatedHours: 0,
         estimatedCost: 0,
-        project_link: '',
+        project_link: "",
         dueDate: null,
       },
       clients,
@@ -75,7 +105,7 @@ const TaskForm = forwardRef<TaskFormRef, TaskFormProps>(
     // Debug form errors
     React.useEffect(() => {
       if (Object.keys(form.formState.errors).length > 0) {
-        console.log('TaskForm validation errors:', form.formState.errors);
+        console.log("TaskForm validation errors:", form.formState.errors);
       }
     }, [form.formState.errors]);
 
@@ -109,12 +139,20 @@ const TaskForm = forwardRef<TaskFormRef, TaskFormProps>(
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder={isLoadingClients ? 'Loading clients...' : 'Select a client'} />
+                      <SelectValue
+                        placeholder={
+                          isLoadingClients
+                            ? "Loading clients..."
+                            : "Select a client"
+                        }
+                      />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {clients.map(client => (
-                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -192,22 +230,21 @@ const TaskForm = forwardRef<TaskFormRef, TaskFormProps>(
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn('w-full pl-3 text-left font-normal', !field.value && 'text-muted-foreground')}
-                        >
-                          {field.value ? format(field.value, 'PPP') : 'Pick a date'}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
+                         <SimpleDatePicker
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Select date"
+                      />
                       </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
+                      {/* <Calendar
                         mode="single"
                         selected={field.value}
                         onSelect={field.onChange}
                         initialFocus
-                      />
+                      /> */}
+                     
                     </PopoverContent>
                   </Popover>
                   <FormMessage />
@@ -243,13 +280,13 @@ const TaskForm = forwardRef<TaskFormRef, TaskFormProps>(
               )}
             />
           </div>
-          <button type="submit" style={{ display: 'none' }} />
+          <button type="submit" style={{ display: "none" }} />
         </form>
       </Form>
     );
   }
 );
 
-TaskForm.displayName = 'TaskForm';
+TaskForm.displayName = "TaskForm";
 
 export default TaskForm;

@@ -10,22 +10,19 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PaymentStatus } from '@/types';
+import SimpleDatePicker from '../ui/CustomCalendar';
 
 const paymentSchema = z.object({
   clientId: z.string().min(1, 'Client is required'),
   taskId: z.string().min(1, 'Task is required'),
   amount: z.coerce.number().positive('Amount must be positive'),
   status: z.enum(['due', 'invoiced', 'pending', 'received', 'overdue', 'canceled']),
-  dueDate: z.date({ required_error: 'Due date is required' }),
+  dueDate: z.date({ required_error: 'Due date is required' }).optional(), // Allow null
   invoiceNumber: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -45,6 +42,7 @@ interface PaymentFormProps {
 
 export interface PaymentFormRef {
   submit: () => void;
+  reset: (values: Partial<PaymentFormValues>) => void;
 }
 
 const PaymentForm = forwardRef<PaymentFormRef, PaymentFormProps>(
@@ -56,7 +54,7 @@ const PaymentForm = forwardRef<PaymentFormRef, PaymentFormProps>(
         taskId: '',
         amount: 0,
         status: 'due',
-        dueDate: new Date(),
+        dueDate: undefined, // Null for new payments
         invoiceNumber: '',
         notes: '',
       },
@@ -76,6 +74,10 @@ const PaymentForm = forwardRef<PaymentFormRef, PaymentFormProps>(
 
     useImperativeHandle(ref, () => ({
       submit: () => form.handleSubmit(onSubmit)(),
+      reset: (values) => {
+        console.log('Resetting form with:', values); // Debug
+        form.reset(values);
+      },
     }));
 
     // Debug form errors
@@ -88,12 +90,12 @@ const PaymentForm = forwardRef<PaymentFormRef, PaymentFormProps>(
     // Watch clientId and fetch tasks when it changes
     const selectedClientId = form.watch('clientId');
     useEffect(() => {
-      if (selectedClientId && !isEditing) {
-        console.log('Client changed to:', selectedClientId);
-        form.setValue('taskId', ''); // Reset taskId when client changes
+      if (selectedClientId && !isEditing && !isLoadingTasks) {
+        console.log('Client changed to:', selectedClientId, 'Current taskId:', form.getValues('taskId'));
+        form.setValue('taskId', ''); // Reset taskId only in add mode
         onClientChange?.(selectedClientId);
       }
-    }, [selectedClientId, onClientChange, form, isEditing]);
+    }, [selectedClientId, onClientChange, form, isEditing, isLoadingTasks]);
 
     return (
       <Form {...form}>
@@ -204,28 +206,11 @@ const PaymentForm = forwardRef<PaymentFormRef, PaymentFormProps>(
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Due Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn('w-full text-left font-normal', !field.value && 'text-muted-foreground')}
-                        >
-                          {field.value ? format(field.value, 'PPP') : 'Pick a date'}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={date => date < new Date('1900-01-01')}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <SimpleDatePicker
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Select due date"
+                  />
                   <FormMessage />
                 </FormItem>
               )}

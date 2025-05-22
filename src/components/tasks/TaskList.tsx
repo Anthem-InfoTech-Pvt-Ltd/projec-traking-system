@@ -15,20 +15,11 @@ import DeleteDialog from '../../components/DeleteDialog';
 import { debounce } from 'lodash';
 import { toast } from 'sonner';
 
-// Timeout utility
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   const timeout = new Promise<T>((_, reject) => {
-    setTimeout(() => {
-      console.warn(`Operation timed out after ${timeoutMs}ms`);
-      reject(new Error(`Operation timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
+    setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
   });
-  try {
-    return await Promise.race([promise, timeout]);
-  } catch (error: any) {
-    console.error(`withTimeout error: ${error.message}`, error.stack);
-    throw error;
-  }
+  return Promise.race([promise, timeout]);
 };
 
 interface TaskListProps {
@@ -38,7 +29,6 @@ interface TaskListProps {
   onStatusChange?: (taskId: string, newStatus: TaskStatus) => Promise<void>;
 }
 
-// Skeleton component for TaskList
 const TaskListSkeleton: React.FC<{ rowsPerPage: number }> = ({ rowsPerPage }) => {
   return (
     <Table>
@@ -79,16 +69,11 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, onStatusCh
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Debounce setDeleteDialogOpen
   const debouncedSetDeleteDialogOpen = useCallback(
-    debounce((open: boolean) => {
-      console.log(`Debounced setDeleteDialogOpen: ${open}`);
-      setDeleteDialogOpen(open);
-    }, 300),
+    debounce((open: boolean) => setDeleteDialogOpen(open), 300),
     []
   );
 
-  // Fetch clients to display names in the table
   useEffect(() => {
     const fetchClients = async () => {
       setIsLoadingClients(true);
@@ -99,9 +84,8 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, onStatusCh
         );
         if (error) throw new Error(`Failed to fetch clients: ${error.message}`);
         setClients(data || []);
-        console.log('Fetched clients:', data);
       } catch (error: any) {
-        console.error('Error fetching clients:', error.message, error.stack);
+        console.error('Error fetching clients:', error);
         toast.error(error.message || 'Failed to fetch clients');
       } finally {
         setIsLoadingClients(false);
@@ -111,7 +95,6 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, onStatusCh
     fetchClients();
   }, []);
 
-  // Reset currentPage to 1 when tasks change
   useEffect(() => {
     setCurrentPage(1);
   }, [tasks]);
@@ -130,14 +113,13 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, onStatusCh
     }
     setIsProcessing(true);
     try {
-      console.log('Deleting task:', taskToDelete);
+      console.log('Initiating delete for task:', taskToDelete);
       await withTimeout(onDelete(taskToDelete), 5000);
       console.log('Delete operation successful for task:', taskToDelete);
-      // Success toast is handled in TasksPage.tsx
       debouncedSetDeleteDialogOpen(false);
       setTaskToDelete(null);
     } catch (error: any) {
-      console.error('Error deleting task:', error.message, error.stack);
+      console.error('Error deleting task:', error);
       // Error toast is handled in TasksPage.tsx
       debouncedSetDeleteDialogOpen(false);
       setTaskToDelete(null);
@@ -165,7 +147,6 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, onStatusCh
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
-  // Paginate tasks
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
   const paginatedTasks = tasks.slice(startIndex, endIndex);

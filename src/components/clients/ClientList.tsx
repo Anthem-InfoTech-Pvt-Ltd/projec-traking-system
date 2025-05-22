@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -14,8 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Edit, MoreVertical, Trash2, Send, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
-import {supabase} from '../../integrations/supabase/client';
-import supabaseAdmin from '../../integrations/supabase/supabaseAdmin';
+import { supabase } from '../../integrations/supabase/client';
 import { Client, ClientStatus } from '@/types';
 import CustomPagination from '@/components/CustomPagination';
 import DeleteDialog from '../../components/DeleteDialog';
@@ -54,8 +53,9 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [showPassword, setShowPassword] = useState(false);
+  const dropdownTriggerRef = useRef<HTMLButtonElement | null>(null);
 
-  // Debounce setDeleteDialogOpen to prevent rapid state changes
+  // Debounce setDeleteDialogOpen
   const debouncedSetDeleteDialogOpen = useCallback(
     debounce((open: boolean) => {
       console.log(`Debounced setDeleteDialogOpen: ${open}`);
@@ -175,67 +175,75 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit }) => {
   };
 
   const handleCreateAccount = async () => {
-  if (!clientToCreateAccount || !password) return;
+    if (!clientToCreateAccount || !password) return;
 
-  setIsProcessing(true);
-  try {
-    const response = await fetch('http://localhost:5000/api/client/resend-credentials', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: clientToCreateAccount.email,
-        password,
-        name: clientToCreateAccount.name,
-        client_id: clientToCreateAccount.id,
-      }),
-    });
+    setIsProcessing(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/client/resend-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: clientToCreateAccount.email,
+          password,
+          name: clientToCreateAccount.name,
+          client_id: clientToCreateAccount.id,
+        }),
+      });
 
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Failed to create account');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to create account');
 
-    toast.success('Account created and credentials sent');
-    setClients(prev =>
-      prev.map(c =>
-        c.id === clientToCreateAccount.id ? { ...c, hasAccount: true } : c
-      )
-    );
-    setCreateAccountDialogOpen(false);
-    setPassword('');
-  } catch (err: any) {
-    console.error('Account creation error:', err.message);
-    toast.error(err.message || 'Failed to create account');
-  } finally {
-    setIsProcessing(false);
-  }
-};
-const handleResendCredentials = async (client) => {
-  if (!client.email) {
-    toast.error('Email is missing');
-    return;
-  }
+      toast.success('Account created and credentials sent');
+      setClients(prev =>
+        prev.map(c =>
+          c.id === clientToCreateAccount.id ? { ...c, hasAccount: true } : c
+        )
+      );
+      setCreateAccountDialogOpen(false);
+      setPassword('');
+    } catch (err: any) {
+      console.error('Account creation error:', err.message);
+      toast.error(err.message || 'Failed to create account');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-  setIsProcessing(true);
-  try {
-    const response = await fetch('http://localhost:5000/api/client/resend-credentials-only', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: client.email,
-        name: client.name,
-      }),
-    });
+  const handleResendCredentials = async (client: Client) => {
+    if (!client.email) {
+      toast.error('Email is missing');
+      return;
+    }
 
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Failed to resend credentials');
+    setIsProcessing(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/client/resend-credentials-only', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: client.email,
+          name: client.name,
+        }),
+      });
 
-    toast.success('Credentials resent successfully');
-  } catch (err) {
-    console.error('Error resending credentials:', err.message);
-    toast.error(err.message || 'Failed to resend credentials');
-  } finally {
-    setIsProcessing(false);
-  }
-};
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to resend credentials');
+
+      toast.success('Credentials resent successfully');
+    } catch (err: any) {
+      console.error('Error resending credentials:', err.message);
+      toast.error(err.message || 'Failed to resend credentials');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDropdownOpenChange = (open: boolean) => {
+    if (!open && dropdownTriggerRef.current) {
+      // Move focus back to trigger when dropdown closes to prevent ARIA issues
+      dropdownTriggerRef.current.focus();
+    }
+  };
 
   // Paginate clients
   const startIndex = (currentPage - 1) * rowsPerPage;
@@ -335,39 +343,33 @@ const handleResendCredentials = async (client) => {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <DropdownMenu>
+                  <DropdownMenu onOpenChange={handleDropdownOpenChange}>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" disabled={isProcessing}>
+                      <Button
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        ref={dropdownTriggerRef}
+                        disabled={isProcessing}
+                      >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onEdit(client.id)} disabled={isProcessing}>
+                      <DropdownMenuItem onClick={() => onEdit(client.id)}>
                         <Edit className="mr-2 h-4 w-4" /> Edit
                       </DropdownMenuItem>
-                      {client.hasAccount ? (
-  <DropdownMenuItem
-    onClick={() => handleResendCredentials(client)}
-    disabled={isProcessing}
-  >
-    <Send className="mr-2 h-4 w-4" /> Resend Credentials
-  </DropdownMenuItem>
-) : (
-  <DropdownMenuItem
-    onClick={() => openCreateAccountDialog(client)}
-    disabled={isProcessing}
-  >
-    <UserPlus className="mr-2 h-4 w-4" /> Create Account
-  </DropdownMenuItem>
-)}
-
-                      <DropdownMenuItem
-                        onClick={() => confirmDelete(client.id)}
-                        className="text-destructive"
-                        disabled={isProcessing}
-                      >
+                      <DropdownMenuItem onClick={() => confirmDelete(client.id)}>
                         <Trash2 className="mr-2 h-4 w-4" /> Delete
                       </DropdownMenuItem>
+                      {client.hasAccount ? (
+                        <DropdownMenuItem onClick={() => handleResendCredentials(client)}>
+                          <Send className="mr-2 h-4 w-4" /> Resend Credentials
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem onClick={() => openCreateAccountDialog(client)}>
+                          <UserPlus className="mr-2 h-4 w-4" /> Create Account
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

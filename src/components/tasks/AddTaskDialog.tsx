@@ -3,7 +3,6 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import TaskForm, { TaskFormRef } from './TaskForm';
 import { Task } from '@/types';
@@ -12,8 +11,8 @@ import { createTaskObject } from './AddTaskDialog.fix';
 interface AddTaskDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddTask: (task: Task) => void;
-  onUpdateTask: (task: Task) => void;
+  onAddTask: (task: Task) => Promise<void>;
+  onUpdateTask: (task: Task) => Promise<void>;
   taskToEdit: Task | null;
 }
 
@@ -26,6 +25,7 @@ const AddTaskDialog: React.FC<AddTaskDialogProps> = ({
 }) => {
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Track submission state
   const formRef = useRef<TaskFormRef>(null);
 
   useEffect(() => {
@@ -39,12 +39,11 @@ const AddTaskDialog: React.FC<AddTaskDialogProps> = ({
           .select('id, name')
           .order('name', { ascending: true });
 
-        if (error) throw error;
-
+        if (error) throw new Error(`Failed to fetch clients: ${error.message}`);
         setClients(data || []);
       } catch (error: any) {
         console.error('Fetch clients error:', error);
-        toast.error('Failed to load clients. Please try again.');
+        // Defer error handling to parent component
       } finally {
         setIsLoadingClients(false);
       }
@@ -63,9 +62,9 @@ const AddTaskDialog: React.FC<AddTaskDialogProps> = ({
     project_link?: string;
     dueDate?: Date | null;
   }) => {
-    console.log('TaskForm submitted with values:', data);
+    setIsSubmitting(true);
     try {
-      const parsedDueDate = data.dueDate ? new Date(data.dueDate) : null;
+      const parsedDueDate = data.dueDate ? new Date(data.dueDate) : undefined;
 
       if (taskToEdit) {
         const updatedTask = {
@@ -73,83 +72,39 @@ const AddTaskDialog: React.FC<AddTaskDialogProps> = ({
           title: data.title,
           clientId: data.clientId,
           description: data.description,
-          status: data.status,
+          status: data.status as TaskStatus,
           estimatedHours: data.estimatedHours,
           estimatedCost: data.estimatedCost,
-          project_link: data.project_link || null,
+          project: data.project_link || null,
           dueDate: parsedDueDate,
           updatedAt: new Date(),
         };
-
-        const { error } = await supabase
-          .from('tasks')
-          .update({
-            title: data.title,
-            client_id: data.clientId,
-            description: data.description,
-            status: data.status,
-            estimated_hours: data.estimatedHours,
-            estimated_cost: data.estimatedCost,
-            project_link: data.project_link || null,
-            due_date: parsedDueDate ? parsedDueDate.toISOString() : null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', taskToEdit.id);
-
-        if (error) {
-          console.error('Supabase update error:', error);
-          throw new Error(`Failed to update task: ${error.message}`);
-        }
-
         await onUpdateTask(updatedTask);
-
-        toast.success('Task updated successfully');
       } else {
         const newTask = createTaskObject({
           id: `task-${Date.now()}`,
           title: data.title,
           clientId: data.clientId,
           description: data.description,
-          status: data.status,
+          status: data.status as TaskStatus,
           estimatedHours: data.estimatedHours,
           estimatedCost: data.estimatedCost,
-          project_link: data.project_link,
+          project: data.project_link,
           createdAt: new Date(),
           updatedAt: new Date(),
           dueDate: parsedDueDate,
         });
-
-        const { error } = await supabase.from('tasks').insert({
-          id: newTask.id,
-          title: newTask.title,
-          client_id: newTask.clientId,
-          description: newTask.description,
-          status: newTask.status,
-          estimated_hours: newTask.estimatedHours,
-          estimated_cost: newTask.estimatedCost,
-          project_link: newTask.project_link || null,
-          created_at: newTask.createdAt.toISOString(),
-          updated_at: newTask.updatedAt.toISOString(),
-          due_date: newTask.dueDate ? newTask.dueDate.toISOString() : null,
-        });
-
-        if (error) {
-          console.error('Supabase insert error:', error);
-          throw new Error(`Failed to create task: ${error.message}`);
-        }
-
         await onAddTask(newTask);
-
-        toast.success('Task created successfully');
       }
       onClose();
     } catch (error: any) {
       console.error('Task save error:', error);
-      toast.error(error.message || 'Failed to save task. Please try again.');
+      // Let parent component handle error toast
+      throw error;
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
-  if (!isOpen) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -172,7 +127,7 @@ const AddTaskDialog: React.FC<AddTaskDialogProps> = ({
             status: taskToEdit.status,
             estimatedHours: taskToEdit.estimatedHours,
             estimatedCost: taskToEdit.estimatedCost,
-            project_link: taskToEdit.project_link || '',
+            project_link: taskToEdit.project || '',
             dueDate: taskToEdit.dueDate ? new Date(taskToEdit.dueDate) : null,
           } : {
             title: '',
@@ -188,7 +143,7 @@ const AddTaskDialog: React.FC<AddTaskDialogProps> = ({
           isLoadingClients={isLoadingClients}
         />
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button
@@ -196,9 +151,9 @@ const AddTaskDialog: React.FC<AddTaskDialogProps> = ({
               console.log('Submitting TaskForm');
               formRef.current?.submit();
             }}
-            disabled={isLoadingClients}
+            disabled={isLoadingClients || isSubmitting}
           >
-            {taskToEdit ? 'Update Task' : 'Create Task'}
+            {isSubmitting ? 'Saving...' : taskToEdit ? 'Update Task' : 'Create Task'}
           </Button>
         </DialogFooter>
       </DialogContent>

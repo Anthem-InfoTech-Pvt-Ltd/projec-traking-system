@@ -1,19 +1,18 @@
-
-import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { 
-  ChevronLeft, 
-  LayoutDashboard, 
-  Users, 
-  FileText, 
+import React from "react";
+import { NavLink } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  ChevronLeft,
+  LayoutDashboard,
+  Users,
+  FileText,
   DollarSign,
   Bell,
   Settings,
-  LogOut
-} from 'lucide-react';
+  LogOut,
+} from "lucide-react";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -23,7 +22,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
   const { user, logout } = useAuth();
 
-  const isAdmin = user && user.role === 'admin';
+  const isAdmin = user && user.role === "admin";
 
   return (
     <aside
@@ -34,7 +33,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
       )}
     >
       <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border">
-        <div className={cn("flex items-center", isOpen ? "justify-start" : "justify-center w-full")}>
+        <div
+          className={cn(
+            "flex items-center",
+            isOpen ? "justify-start" : "justify-center w-full"
+          )}
+        >
           {isOpen ? (
             <div className="flex items-center">
               <img
@@ -52,13 +56,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
             />
           )}
         </div>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={toggleSidebar} 
-          className={cn("text-sidebar-foreground hover:bg-sidebar-accent", !isOpen && "hidden md:flex")}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleSidebar}
+          className={cn(
+            "text-sidebar-foreground hover:bg-sidebar-accent",
+            !isOpen && "hidden md:flex"
+          )}
         >
-          <ChevronLeft className={cn("h-4 w-4 transition-transform", !isOpen && "rotate-180")} />
+          <ChevronLeft
+            className={cn(
+              "h-4 w-4 transition-transform",
+              !isOpen && "rotate-180"
+            )}
+          />
         </Button>
       </div>
 
@@ -66,11 +78,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
         <nav className="px-2 space-y-1">
           <NavLink
             to="/dashboard"
-            className={({ isActive }) => cn(
-              "flex items-center px-4 py-2 text-sm font-medium rounded-md",
-              isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              !isOpen && "justify-center"
-            )}
+            end
+            className={({ isActive }) =>
+              cn(
+                "flex items-center px-4 py-2 text-sm font-medium rounded-md",
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                !isOpen && "justify-center"
+              )
+            }
           >
             <LayoutDashboard className="h-5 w-5" />
             {isOpen && <span className="ml-3">Dashboard</span>}
@@ -79,11 +96,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
           {isAdmin && (
             <NavLink
               to="/dashboard/clients"
-              className={({ isActive }) => cn(
-                "flex items-center px-4 py-2 text-sm font-medium rounded-md",
-                isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                !isOpen && "justify-center"
-              )}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center px-4 py-2 text-sm font-medium rounded-md",
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  !isOpen && "justify-center"
+                )
+              }
             >
               <Users className="h-5 w-5" />
               {isOpen && <span className="ml-3">Clients</span>}
@@ -92,11 +113,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
 
           <NavLink
             to="/dashboard/tasks"
-            className={({ isActive }) => cn(
-              "flex items-center px-4 py-2 text-sm font-medium rounded-md",
-              isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              !isOpen && "justify-center"
-            )}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center px-4 py-2 text-sm font-medium rounded-md",
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                !isOpen && "justify-center"
+              )
+            }
           >
             <FileText className="h-5 w-5" />
             {isOpen && <span className="ml-3">Tasks</span>}
@@ -104,11 +129,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
 
           <NavLink
             to="/dashboard/payments"
-            className={({ isActive }) => cn(
-              "flex items-center px-4 py-2 text-sm font-medium rounded-md",
-              isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              !isOpen && "justify-center"
-            )}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center px-4 py-2 text-sm font-medium rounded-md",
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                !isOpen && "justify-center"
+              )
+            }
           >
             <DollarSign className="h-5 w-5" />
             {isOpen && <span className="ml-3">Payments</span>}
@@ -116,11 +145,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
 
           <NavLink
             to="/dashboard/notifications"
-            className={({ isActive }) => cn(
-              "flex items-center px-4 py-2 text-sm font-medium rounded-md",
-              isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              !isOpen && "justify-center"
-            )}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center px-4 py-2 text-sm font-medium rounded-md",
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                !isOpen && "justify-center"
+              )
+            }
           >
             <Bell className="h-5 w-5" />
             {isOpen && <span className="ml-3">Notifications</span>}
@@ -128,11 +161,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
 
           <NavLink
             to="/dashboard/settings"
-            className={({ isActive }) => cn(
-              "flex items-center px-4 py-2 text-sm font-medium rounded-md",
-              isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              !isOpen && "justify-center"
-            )}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center px-4 py-2 text-sm font-medium rounded-md",
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                !isOpen && "justify-center"
+              )
+            }
           >
             <Settings className="h-5 w-5" />
             {isOpen && <span className="ml-3">Settings</span>}

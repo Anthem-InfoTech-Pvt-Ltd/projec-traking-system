@@ -1,44 +1,32 @@
-import React, { useCallback, useEffect, useState, useRef } from 'react';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from '@/components/ui/dialog';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import PaymentForm, { PaymentFormRef } from './PaymentForm';
+import { Payment } from '@/types';
 
 interface AddPaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   paymentId: string | null;
-  onPaymentSaved: () => void;
+  onPaymentSaved: (payment: Payment) => void;
 }
 
-const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
-  open,
-  onOpenChange,
-  paymentId,
-  onPaymentSaved,
-}) => {
+const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({ open, onOpenChange, paymentId, onPaymentSaved }) => {
   const isEditing = paymentId !== null;
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [tasks, setTasks] = useState<{ id: string; title: string }[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [defaultValues, setDefaultValues] = useState<{
-    clientId: string;
-    taskId: string;
-    amount: number;
-    status: string;
-    dueDate: Date;
-    invoiceNumber?: string;
-    notes?: string;
+    clientId: string; taskId: string; amount: number; status: string; dueDate?: Date; invoiceNumber?: string; notes?: string;
   }>({
     clientId: '',
     taskId: '',
     amount: 0,
     status: 'due',
-    dueDate: new Date(),
+    dueDate: undefined, // Null for new payments
     invoiceNumber: '',
     notes: '',
   });
@@ -46,69 +34,56 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
 
   const fetchClients = useCallback(async () => {
     setIsLoadingClients(true);
-    const isMounted = { current: true };
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('id, name')
-        .order('name', { ascending: true });
+      const { data, error } = await supabase.from('clients').select('id, name').order('name', { ascending: true });
       if (error) throw error;
-      if (isMounted.current) setClients(data ?? []);
+      setClients(data ?? []);
     } catch (err) {
       console.error('Fetch clients error:', err);
       toast.error('Failed to load clients');
     } finally {
-      if (isMounted.current) setIsLoadingClients(false);
+      setIsLoadingClients(false);
     }
-    return () => { isMounted.current = false; };
   }, []);
 
   const fetchTasks = useCallback(async (clientId: string) => {
-    if (!clientId) return;
+    if (!clientId) return [];
     setIsLoadingTasks(true);
-    const isMounted = { current: true };
     try {
-      console.log('Fetching tasks for clientId:', clientId);
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('id, title')
-        .eq('client_id', clientId)
-        .order('title', { ascending: true });
+      const { data, error } = await supabase.from('tasks').select('id, title').eq('client_id', clientId).order('title', { ascending: true });
       if (error) throw error;
-      if (isMounted.current) {
-        console.log('Tasks fetched:', data);
-        setTasks(data ?? []);
-      }
+      setTasks(data ?? []);
+      return data ?? [];
     } catch (err) {
       console.error('Fetch tasks error:', err);
       toast.error('Failed to load tasks');
+      return [];
     } finally {
-      if (isMounted.current) setIsLoadingTasks(false);
+      setIsLoadingTasks(false);
     }
-    return () => { isMounted.current = false; };
   }, []);
 
   const fetchPayment = useCallback(async () => {
     if (!paymentId) return;
     try {
-      const { data, error } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('id', paymentId)
-        .single();
+      const { data, error } = await supabase.from('payments').select('*').eq('id', paymentId).single();
       if (error) throw error;
-
       if (data) {
-        setDefaultValues({
+        const paymentValues = {
           clientId: data.client_id,
           taskId: data.task_id,
           amount: data.amount,
           status: data.status,
-          dueDate: new Date(data.due_date),
+          dueDate: data.due_date ? new Date(data.due_date) : undefined,
           invoiceNumber: data.invoice_number || '',
           notes: data.notes || '',
-        });
-        await fetchTasks(data.client_id);
+        };
+        // Fetch tasks and wait for them to load
+        const tasks = await fetchTasks(data.client_id);
+        console.log('Fetched payment:', data, 'Tasks:', tasks); // Debug
+        setDefaultValues(paymentValues);
+        // Reset form after tasks are loaded
+        formRef.current?.reset(paymentValues);
       }
     } catch (err) {
       console.error('Fetch payment error:', err);
@@ -119,63 +94,97 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
   useEffect(() => {
     if (open) {
       fetchClients();
-      if (isEditing) fetchPayment();
+      if (isEditing) {
+        fetchPayment();
+      } else {
+        const initialValues = {
+          clientId: '',
+          taskId: '',
+          amount: 0,
+          status: 'due',
+          dueDate: undefined, // Null for new payments
+          invoiceNumber: '',
+          notes: '',
+        };
+        setDefaultValues(initialValues);
+        setTasks([]);
+        formRef.current?.reset(initialValues);
+      }
     } else {
-      setDefaultValues({
+      const initialValues = {
         clientId: '',
         taskId: '',
         amount: 0,
         status: 'due',
-        dueDate: new Date(),
+        dueDate: undefined,
         invoiceNumber: '',
         notes: '',
-      });
+      };
+      setDefaultValues(initialValues);
       setTasks([]);
+      formRef.current?.reset(initialValues);
     }
   }, [open, fetchClients, fetchPayment, isEditing]);
 
   const onSubmit = async (values: {
-    clientId: string;
-    taskId: string;
-    amount: number;
-    status: string;
-    dueDate: Date;
-    invoiceNumber?: string;
-    notes?: string;
+    clientId: string; taskId: string; amount: number; status: string; dueDate?: Date; invoiceNumber?: string; notes?: string;
   }) => {
-    console.log('PaymentForm submitted with values:', values);
     try {
       const payload = {
         client_id: values.clientId,
         task_id: values.taskId,
         amount: values.amount,
         status: values.status,
-        due_date: values.dueDate.toISOString(),
-        invoice_number: values.invoiceNumber,
-        notes: values.notes,
+        due_date: values.dueDate ? values.dueDate.toISOString() : null, // Handle null dueDate
+        invoice_number: values.invoiceNumber || null,
+        notes: values.notes || null,
         updated_at: new Date().toISOString(),
       };
 
+      let newPayment: Payment;
       if (isEditing) {
-        const { error } = await supabase
-          .from('payments')
-          .update(payload)
-          .eq('id', paymentId);
+        const { data, error } = await supabase.from('payments').update(payload).eq('id', paymentId).select().single();
         if (error) throw error;
+        newPayment = {
+          id: paymentId!,
+          taskId: data.task_id,
+          clientId: data.client_id,
+          amount: data.amount,
+          status: data.status,
+          dueDate: data.due_date ? new Date(data.due_date) : undefined,
+          invoiceNumber: data.invoice_number,
+          invoicedAt: data.invoiced_at ? new Date(data.invoiced_at) : undefined,
+          receivedAt: data.received_at ? new Date(data.received_at) : undefined,
+          createdAt: new Date(data.created_at),
+          updatedAt: new Date(data.updated_at),
+          notes: data.notes,
+        };
       } else {
         payload['created_at'] = new Date().toISOString();
-        const { error } = await supabase
-          .from('payments')
-          .insert([payload]);
+        const { data, error } = await supabase.from('payments').insert([payload]).select().single();
         if (error) throw error;
+        newPayment = {
+          id: data.id,
+          taskId: data.task_id,
+          clientId: data.client_id,
+          amount: data.amount,
+          status: data.status,
+          dueDate: data.due_date ? new Date(data.due_date) : undefined,
+          invoiceNumber: data.invoice_number,
+          invoicedAt: data.invoiced_at ? new Date(data.invoiced_at) : undefined,
+          receivedAt: data.received_at ? new Date(data.received_at) : undefined,
+          createdAt: new Date(data.created_at),
+          updatedAt: new Date(data.updated_at),
+          notes: data.notes,
+        };
       }
 
-      toast.success(isEditing ? 'Payment updated successfully' : 'Payment added successfully');
+      toast.success(isEditing ? 'Payment updated' : 'Payment added');
+      onPaymentSaved(newPayment);
       onOpenChange(false);
-      onPaymentSaved();
     } catch (err: any) {
-      console.error('Payment save error:', err);
-      toast.error(err.message || 'Failed to save payment');
+      console.error('Payment save error:', err.message);
+      toast.error('Failed to save payment');
     }
   };
 
@@ -183,12 +192,10 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] w-full max-w-lg max-h-[95vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Payment' : 'Add New Payment'}</DialogTitle>
-          <DialogDescription>
-            {isEditing ? 'Update the payment information below.' : 'Fill in the payment information to create a new record.'}
-          </DialogDescription>
+          <DialogTitle>{isEditing ? 'Edit Payment' : 'Add Payment'}</DialogTitle>
+          <DialogDescription>{isEditing ? 'Update payment details.' : 'Create a new payment record.'}</DialogDescription>
         </DialogHeader>
         <PaymentForm
           ref={formRef}
@@ -202,17 +209,9 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
           onClientChange={fetchTasks}
         />
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => {
-              console.log('Submitting PaymentForm');
-              formRef.current?.submit();
-            }}
-            disabled={isLoadingClients || isLoadingTasks}
-          >
-            {isEditing ? 'Update Payment' : 'Add Payment'}
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => formRef.current?.submit()} disabled={isLoadingClients || isLoadingTasks}>
+            {isEditing ? 'Update' : 'Add'}
           </Button>
         </DialogFooter>
       </DialogContent>

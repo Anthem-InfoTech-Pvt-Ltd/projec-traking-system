@@ -36,33 +36,27 @@ const TasksPage: React.FC = () => {
     dueDateEnd: null,
   });
   const { user } = useAuth();
-  
+
   const fetchTasks = useCallback(async () => {
     try {
       setIsLoading(true);
       let query = supabase.from('tasks').select('*');
       
-      console.log('Applying filters to query:', filters);
       if (user?.role !== 'admin') {
         query = query.eq('client_id', user.app_metadata.clientId);
-        console.log('Non-admin filter applied: client_id =', user.app_metadata.clientId);
       } else if (filters.clientId) {
         query = query.eq('client_id', filters.clientId);
-        console.log('Client filter applied: client_id =', filters.clientId);
       }
       
       if (filters.statuses.length > 0) {
         query = query.in('status', filters.statuses);
-        console.log('Status filter applied:', filters.statuses);
       }
       
       if (filters.dueDateStart) {
         query = query.gte('due_date', filters.dueDateStart.toISOString());
-        console.log('Due date start filter applied:', filters.dueDateStart.toISOString());
       }
       if (filters.dueDateEnd) {
         query = query.lte('due_date', filters.dueDateEnd.toISOString());
-        console.log('Due date end filter applied:', filters.dueDateEnd.toISOString());
       }
       
       query = query.order('created_at', { ascending: false });
@@ -70,7 +64,6 @@ const TasksPage: React.FC = () => {
       const { data, error } = await query;
       
       if (error) {
-        console.error('Supabase fetch tasks error:', error);
         throw new Error('Failed to fetch tasks: ' + error.message);
       }
       
@@ -84,15 +77,13 @@ const TasksPage: React.FC = () => {
         estimatedCost: task.estimated_cost,
         actualHours: task.actual_hours,
         actualCost: task.actual_cost,
-        project: task.project_Link, // Updated to match schema
-        notes: task.notes, // Added to match schema
+        project: task.project_link,
         createdAt: new Date(task.created_at),
         updatedAt: new Date(task.updated_at),
         dueDate: task.due_date ? new Date(task.due_date) : undefined,
         completedAt: task.completed_at ? new Date(task.completed_at) : undefined,
       }));
       
-      console.log('Fetched tasks:', formattedTasks);
       setTasks(formattedTasks);
     } catch (error: any) {
       console.error('Error fetching tasks:', error);
@@ -132,9 +123,8 @@ const TasksPage: React.FC = () => {
               estimatedHours: payload.new.estimated_hours,
               estimatedCost: payload.new.estimated_cost,
               actualHours: payload.new.actual_hours,
-              actualCost: task.actual_cost,
-              project: task.project_Link, // Updated to match schema
-              notes: task.notes, // Added to match schema
+              actualCost: payload.new.actual_cost,
+              project: payload.new.project_link,
               createdAt: new Date(payload.new.created_at),
               updatedAt: new Date(payload.new.updated_at),
               dueDate: payload.new.due_date ? new Date(payload.new.due_date) : undefined,
@@ -147,11 +137,7 @@ const TasksPage: React.FC = () => {
               (!filters.dueDateEnd || (newTask.dueDate && newTask.dueDate <= filters.dueDateEnd)) &&
               (user?.role !== 'admin' ? newTask.clientId === user?.app_metadata.clientId : true);
             if (matchesFilters) {
-              setTasks((prev) => {
-                const updated = [newTask, ...prev.filter((t) => t.id !== newTask.id)];
-                console.log('Added new task to state:', updated);
-                return updated;
-              });
+              setTasks((prev) => [newTask, ...prev.filter((t) => t.id !== newTask.id)]);
             }
           } else if (payload.eventType === 'UPDATE') {
             const updatedTask: Task = {
@@ -163,9 +149,8 @@ const TasksPage: React.FC = () => {
               estimatedHours: payload.new.estimated_hours,
               estimatedCost: payload.new.estimated_cost,
               actualHours: payload.new.actual_hours,
-              actualCost: task.actual_cost,
-              project: task.project_Link, // Updated to match schema
-              notes: task.notes, // Added to match schema
+              actualCost: payload.new.actual_cost,
+              project: payload.new.project_link,
               createdAt: new Date(payload.new.created_at),
               updatedAt: new Date(payload.new.updated_at),
               dueDate: payload.new.due_date ? new Date(payload.new.due_date) : undefined,
@@ -180,23 +165,20 @@ const TasksPage: React.FC = () => {
             setTasks((prev) => {
               const exists = prev.some((t) => t.id === updatedTask.id);
               if (matchesFilters) {
-                const updated = exists
+                return exists
                   ? prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
                   : [updatedTask, ...prev];
-                console.log('Updated task in state:', updated);
-                return updated;
               } else if (exists) {
-                const updated = prev.filter((t) => t.id !== updatedTask.id);
-                console.log('Removed updated task from state (no longer matches filters):', updated);
-                return updated;
+                return prev.filter((t) => t.id !== updatedTask.id);
               }
               return prev;
             });
           } else if (payload.eventType === 'DELETE') {
+            console.log('Processing DELETE event for task:', payload.old.id);
             setTasks((prev) => {
-              const updated = prev.filter((t) => t.id !== payload.old.id);
-              console.log('Deleted task from state:', updated);
-              return updated;
+              const updatedTasks = prev.filter((t) => t.id !== payload.old.id);
+              console.log('Tasks after DELETE event:', updatedTasks);
+              return updatedTasks;
             });
           }
         }
@@ -208,7 +190,7 @@ const TasksPage: React.FC = () => {
           console.error('Subscription error:', err);
           toast({
             title: "Error",
-            description: "Failed to subscribe to task updates",
+            description: "Failed to subscribe to task updates. Changes may not reflect in real-time.",
             variant: "destructive",
           });
         }
@@ -230,8 +212,7 @@ const TasksPage: React.FC = () => {
         status: newTask.status,
         estimated_hours: newTask.estimatedHours,
         estimated_cost: newTask.estimatedCost,
-        project_Link: newTask.project, // Updated to match schema
-        notes: newTask.notes, // Added to match schema
+        project_link: newTask.project || null,
         due_date: newTask.dueDate?.toISOString(),
         created_at: newTask.createdAt.toISOString(),
         updated_at: newTask.updatedAt.toISOString(),
@@ -241,9 +222,17 @@ const TasksPage: React.FC = () => {
         .from('tasks')
         .insert([supabaseTask]);
       
-      if (error) {
-        console.error('Supabase insert task error:', error);
-        throw error;
+      if (error) throw new Error(`Failed to create task: ${error.message}`);
+      
+      const matchesFilters =
+        (!filters.statuses.length || filters.statuses.includes(newTask.status)) &&
+        (!filters.clientId || newTask.clientId === filters.clientId) &&
+        (!filters.dueDateStart || (newTask.dueDate && newTask.dueDate >= filters.dueDateStart)) &&
+        (!filters.dueDateEnd || (newTask.dueDate && newTask.dueDate <= filters.dueDateEnd)) &&
+        (user?.role !== 'admin' ? newTask.clientId === user?.app_metadata.clientId : true);
+      
+      if (matchesFilters) {
+        setTasks((prev) => [newTask, ...prev.filter((t) => t.id !== newTask.id)]);
       }
       
       toast({
@@ -254,9 +243,10 @@ const TasksPage: React.FC = () => {
       console.error('Error adding task:', error);
       toast({
         title: "Error",
-        description: "Failed to create task: " + error.message,
+        description: error.message || "Failed to create task. Please try again.",
         variant: "destructive",
       });
+      throw error;
     }
   };
   
@@ -269,8 +259,7 @@ const TasksPage: React.FC = () => {
         status: updatedTask.status,
         estimated_hours: updatedTask.estimatedHours,
         estimated_cost: updatedTask.estimatedCost,
-        project_Link: updatedTask.project, // Updated to match schema
-        notes: updatedTask.notes, // Added to match schema
+        project_link: updatedTask.project || null,
         due_date: updatedTask.dueDate?.toISOString(),
         completed_at: updatedTask.completedAt?.toISOString(),
         updated_at: new Date().toISOString(),
@@ -281,10 +270,7 @@ const TasksPage: React.FC = () => {
         .update(supabaseTask)
         .eq('id', updatedTask.id);
       
-      if (error) {
-        console.error('Supabase update task error:', error);
-        throw error;
-      }
+      if (error) throw new Error(`Failed to update task: ${error.message}`);
       
       setTaskToEdit(null);
       
@@ -296,27 +282,34 @@ const TasksPage: React.FC = () => {
       console.error('Error updating task:', error);
       toast({
         title: "Error",
-        description: "Failed to update task: " + error.message,
+        description: error.message || "Failed to update task. Please try again.",
         variant: "destructive",
       });
+      throw error;
     }
   };
   
   const handleDeleteTask = async (taskId: string) => {
     try {
-      console.log('Attempting to delete task with ID:', taskId);
+      // Optimistically update the state by removing the task
+      const previousTasks = tasks; // Store current tasks for rollback
+      setTasks((prev) => {
+        const updatedTasks = prev.filter((t) => t.id !== taskId);
+        console.log('Optimistically removed task:', taskId, 'New tasks:', updatedTasks);
+        return updatedTasks;
+      });
+
       const { error } = await supabase
         .from('tasks')
         .delete()
         .eq('id', taskId);
       
       if (error) {
-        console.error('Supabase delete task error:', error);
-        throw new Error('Failed to delete task: ' + error.message);
+        // Revert optimistic update on error
+        setTasks(previousTasks);
+        throw new Error(`Failed to delete task: ${error.message}`);
       }
       
-      console.log('Task deleted successfully from database:', taskId);
-      // Real-time subscription will handle state update
       toast({
         title: "Task deleted",
         description: "The task has been deleted successfully.",
@@ -325,10 +318,10 @@ const TasksPage: React.FC = () => {
       console.error('Error deleting task:', error);
       toast({
         title: "Error",
-        description: "Failed to delete task: " + error.message,
+        description: error.message || "Failed to delete task. Please try again.",
         variant: "destructive",
       });
-      throw error; // Re-throw to ensure TaskList.tsx catches it
+      throw error; // Re-throw to inform TaskList
     }
   };
   
@@ -341,16 +334,13 @@ const TasksPage: React.FC = () => {
     try {
       const taskToUpdate = tasks.find(task => task.id === taskId);
       
-      if (!taskToUpdate) {
-        console.error('Task not found for status update:', taskId);
-        return;
-      }
+      if (!taskToUpdate) throw new Error('Task not found');
       
       const updatedTask = {
         ...taskToUpdate,
         status: newStatus,
         updatedAt: new Date(),
-        ...(newStatus === 'complete' ? { completedAt: new Date() } : {})
+        ...(newStatus === 'complete' ? { completedAt: new Date() } : { completedAt: undefined }),
       };
       
       await handleUpdateTask(updatedTask);
@@ -358,14 +348,13 @@ const TasksPage: React.FC = () => {
       console.error('Error updating task status:', error);
       toast({
         title: "Error",
-        description: "Failed to update task status: " + error.message,
+        description: error.message || "Failed to update task status. Please try again.",
         variant: "destructive",
       });
     }
   };
 
   const handleApplyFilters = (newFilters: TaskFilter) => {
-    console.log('New filters applied:', newFilters);
     setFilters(newFilters);
   };
 
