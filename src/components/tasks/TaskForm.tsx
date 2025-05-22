@@ -30,7 +30,7 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TaskStatus } from "@/types";
-import SimpleDatePicker from "../ui/CustomCalendar";
+import SimpleDatePicker from "../ui/customCalendar";
 
 const taskFormSchema = z.object({
   title: z
