@@ -43,7 +43,7 @@ const TasksPage: React.FC = () => {
       let query = supabase.from('tasks').select('*');
       
       if (user?.role !== 'admin') {
-        query = query.eq('client_id', user.app_metadata.clientId);
+        query = query.eq('client_id', user.clientId);
       } else if (filters.clientId) {
         query = query.eq('client_id', filters.clientId);
       }

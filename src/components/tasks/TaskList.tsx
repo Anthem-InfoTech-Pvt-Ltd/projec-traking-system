@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Edit, Trash2, MoreVertical } from 'lucide-react';
+import { Edit, Trash2, MoreVertical, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { Task, TaskStatus } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +14,7 @@ import CustomPagination from '@/components/CustomPagination';
 import DeleteDialog from '../../components/DeleteDialog';
 import { debounce } from 'lodash';
 import { toast } from 'sonner';
+import { useAuth } from '@/context/AuthContext'; // Import useAuth
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   const timeout = new Promise<T>((_, reject) => {
@@ -76,6 +77,8 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, onStatusCh
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const { user } = useAuth(); // Get user from AuthContext
+  const isClient = user?.role === 'client'; // Check if user is a client
 
   const debouncedSetDeleteDialogOpen = useCallback(
     debounce((open: boolean) => setDeleteDialogOpen(open), 300),
@@ -185,7 +188,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, onStatusCh
             <TableHead>Estimated Hours</TableHead>
             <TableHead>Estimated Cost</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-right">{isClient ? 'Project Link' : 'Actions'}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -209,26 +212,42 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, onStatusCh
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  {(onEdit || onDelete || onStatusChange) && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" disabled={isProcessing}>
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {onEdit && (
-                          <DropdownMenuItem onClick={() => onEdit(task)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                        )}
-                        {onDelete && (
-                          <DropdownMenuItem onClick={() => confirmDelete(task.id)} className="text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                  {isClient ? (
+                    task.project ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(task.project, '_blank')}
+                        className="gap-1"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Open Project
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )
+                  ) : (
+                    (onEdit || onDelete || onStatusChange) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" disabled={isProcessing}>
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {onEdit && (
+                            <DropdownMenuItem onClick={() => onEdit(task)}>
+                              <Edit className="mr-2 h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                          )}
+                          {onDelete && (
+                            <DropdownMenuItem onClick={() => confirmDelete(task.id)} className="text-destructive">
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )
                   )}
                 </TableCell>
               </TableRow>

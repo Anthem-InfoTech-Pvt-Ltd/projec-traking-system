@@ -15,16 +15,26 @@ const PaymentsPage: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const clientId = user?.app_metadata?.clientId;
+  const clientId = user?.clientId;
 
   // Fetch payments
   const fetchPayments = useCallback(async () => {
     try {
+      if (!isAdmin && !clientId) {
+        console.error('No clientId found for non-admin user:', user);
+        toast.error('Unable to load payments: User configuration error');
+        setPayments([]);
+        return;
+      }
+
       let query = supabase.from('payments').select('*');
-      if (!isAdmin && clientId) query = query.eq('client_id', clientId).in('status', ['invoiced', 'overdue', 'pending']);
+      if (!isAdmin && clientId) {
+        query = query.eq('client_id', clientId).in('status', ['invoiced', 'overdue', 'pending']);
+      }
       const { data, error } = await query;
       if (error) throw error;
-      setPayments(data.map((p: any) => ({
+      
+      const formattedPayments = data.map((p: any) => ({
         id: p.id,
         taskId: p.task_id,
         clientId: p.client_id,
@@ -37,12 +47,17 @@ const PaymentsPage: React.FC = () => {
         createdAt: new Date(p.created_at),
         updatedAt: new Date(p.updated_at),
         notes: p.notes,
-      })));
+      }));
+
+      // Log for debugging
+      console.log('Fetched payments:', formattedPayments);
+      setPayments(formattedPayments);
     } catch (error: any) {
       console.error('Fetch payments error:', error.message);
       toast.error('Failed to load payments');
+      setPayments([]);
     }
-  }, [isAdmin, clientId]);
+  }, [isAdmin, clientId, user]);
 
   useEffect(() => {
     fetchPayments();
@@ -67,20 +82,33 @@ const PaymentsPage: React.FC = () => {
           updatedAt: new Date(payload.new.updated_at),
           notes: payload.new.notes,
         };
-        if (isAdmin || newPayment.clientId === clientId) {
+        if (isAdmin || (clientId && newPayment.clientId === clientId && ['invoiced', 'overdue', 'pending'].includes(newPayment.status))) {
+          console.log('Adding real-time payment:', newPayment);
           setPayments((prev) => [newPayment, ...prev.filter((p) => p.id !== newPayment.id)]);
         }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'payments' }, (payload) => {
+        console.log('Removing real-time payment:', payload.old.id);
         setPayments((prev) => prev.filter((p) => p.id !== payload.old.id));
       })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Subscribed to payments table changes');
+        } else if (err) {
+          console.error('Subscription error:', err);
+          toast.error('Failed to subscribe to payment updates');
+        }
+      });
+    return () => {
+      console.log('Unsubscribing from payments table changes');
+      supabase.removeChannel(channel);
+    };
   }, [isAdmin, clientId]);
 
   // Handle payment addition
   const handlePaymentSaved = useCallback((newPayment: Payment) => {
-    if (isAdmin || newPayment.clientId === clientId) {
+    if (isAdmin || (clientId && newPayment.clientId === clientId && ['invoiced', 'overdue', 'pending'].includes(newPayment.status))) {
+      console.log('Saving payment:', newPayment);
       setPayments((prev) => [newPayment, ...prev.filter((p) => p.id !== newPayment.id)]);
     }
     setOpen(false);
@@ -89,6 +117,7 @@ const PaymentsPage: React.FC = () => {
 
   // Handle payment deletion
   const handlePaymentDeleted = useCallback((paymentId: string) => {
+    console.log('Deleting payment:', paymentId);
     setPayments((prev) => prev.filter((p) => p.id !== paymentId));
   }, []);
 

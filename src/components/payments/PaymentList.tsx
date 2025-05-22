@@ -69,11 +69,13 @@ const PaymentList: React.FC<PaymentListProps> = ({ payments, onEdit, onDelete })
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isClient = user?.role === 'client';
+  const clientId = user?.clientId;
 
   const debouncedSetDeleteDialogOpen = useMemo(() => debounce((open: boolean) => setDeleteDialogOpen(open), 300), []);
 
   useEffect(() => () => debouncedSetDeleteDialogOpen.cancel(), [debouncedSetDeleteDialogOpen]);
-
+// console.log("client: ", clientId);
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -101,7 +103,26 @@ const PaymentList: React.FC<PaymentListProps> = ({ payments, onEdit, onDelete })
   const getClientName = useCallback((clientId: string) => clients.find(c => c.id === clientId)?.name || 'Unknown', [clients]);
   const getTaskTitle = useCallback((taskId: string) => tasks.find(t => t.id === taskId)?.title || 'Unknown', [tasks]);
 
-  const getStatusColor = useCallback((status: PaymentStatus) => ({
+  const initiatePayment = useCallback((payment: Payment) => {
+    setSelectedPayment(payment);
+    setPaymentDialogOpen(true);
+  }, []);
+
+  const filteredPayments = useMemo(() => {
+    if (isAdmin || !clientId) {
+      return payments;
+    }
+    return payments.filter((payment) => payment.clientId === clientId); // Removed status filter
+  }, [payments, isAdmin, clientId]);
+
+  const paginatedPayments = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredPayments.slice(start, start + rowsPerPage);
+  }, [filteredPayments, currentPage, rowsPerPage]);
+
+  const formatCurrency = useCallback((amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount), []);
+
+    const getStatusColor = useCallback((status: PaymentStatus) => ({
     received: 'bg-green-100 text-green-800 hover:bg-green-200',
     due: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
     invoiced: 'bg-purple-100 text-purple-800 hover:bg-purple-200',
@@ -170,13 +191,6 @@ const PaymentList: React.FC<PaymentListProps> = ({ payments, onEdit, onDelete })
     }
   }, []);
 
-  const formatCurrency = useCallback((amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount), []);
-
-  const initiatePayment = useCallback((payment: Payment) => {
-    setSelectedPayment(payment);
-    setPaymentDialogOpen(true);
-  }, []);
-
   const handlePayNow = useCallback((payment: Payment) => {
     setIsProcessing(true);
     try {
@@ -204,11 +218,6 @@ const PaymentList: React.FC<PaymentListProps> = ({ payments, onEdit, onDelete })
     }
   }, []);
 
-  const paginatedPayments = useMemo(() => {
-    const start = (currentPage - 1) * rowsPerPage;
-    return payments.slice(start, start + rowsPerPage);
-  }, [payments, currentPage, rowsPerPage]);
-
   if (isLoading) return <SkeletonRow rowsPerPage={rowsPerPage} />;
 
   return (
@@ -216,7 +225,7 @@ const PaymentList: React.FC<PaymentListProps> = ({ payments, onEdit, onDelete })
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>{isAdmin ? 'Client' : 'Task'}</TableHead>
+            <TableHead>{isAdmin ? 'Client' : null}</TableHead>
             <TableHead>Task</TableHead>
             <TableHead>Amount</TableHead>
             <TableHead>Due Date</TableHead>
@@ -233,7 +242,7 @@ const PaymentList: React.FC<PaymentListProps> = ({ payments, onEdit, onDelete })
           ) : (
             paginatedPayments.map((payment) => (
               <TableRow key={payment.id} className={getRowColor(payment.status)}>
-                <TableCell className="font-medium">{isAdmin ? getClientName(payment.clientId) : `Task #${payment.taskId}`}</TableCell>
+                <TableCell className="font-medium">{isAdmin ? getClientName(payment.clientId) : null }</TableCell>
                 <TableCell>{getTaskTitle(payment.taskId)}</TableCell>
                 <TableCell>{formatCurrency(payment.amount)}</TableCell>
                 <TableCell>{format(payment.dueDate, 'MMM d, yyyy')}</TableCell>
@@ -275,7 +284,7 @@ const PaymentList: React.FC<PaymentListProps> = ({ payments, onEdit, onDelete })
         </TableBody>
       </Table>
       <CustomPagination
-        totalItems={payments.length}
+        totalItems={filteredPayments.length}
         rowsPerPage={rowsPerPage}
         setRowsPerPage={setRowsPerPage}
         currentPage={currentPage}
