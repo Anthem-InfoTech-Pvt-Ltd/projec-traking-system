@@ -21,7 +21,7 @@ import DeleteDialog from '../../components/DeleteDialog';
 import { debounce } from 'lodash';
 
 // Timeout utility
-const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   const timeout = new Promise<T>((_, reject) => {
     setTimeout(() => {
       console.warn(`Operation timed out after ${timeoutMs}ms`);
@@ -34,7 +34,7 @@ const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T
     console.error(`withTimeout error: ${error.message}`, error.stack);
     throw error;
   }
-};
+}
 
 interface ClientListProps {
   onEdit: (clientId: string) => void;
@@ -217,7 +217,7 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit }) => {
 
     setIsProcessing(true);
     try {
-      const response = await fetch('https://projec-traking-system-backend.vercel.app/api/client/resend-credentials-only', {
+      const response = await fetch('http://localhost:5000 /api/client/resend-credentials-only', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

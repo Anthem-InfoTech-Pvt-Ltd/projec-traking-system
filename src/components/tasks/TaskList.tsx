@@ -17,9 +17,17 @@ import { toast } from 'sonner';
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   const timeout = new Promise<T>((_, reject) => {
-    setTimeout(() => reject(new Error('Timed out')), timeoutMs);
+    setTimeout(() => {
+      console.warn(`Operation timed out after ${timeoutMs}ms`);
+      reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
   });
-  return Promise.race([promise, timeout]);
+  try {
+    return await Promise.race([promise, timeout]);
+  } catch (error: any) {
+    console.error(`withTimeout error: ${error.message}`, error.stack);
+    throw error;
+  }
 }
 
 interface TaskListProps {
