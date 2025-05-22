@@ -28,7 +28,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { TaskStatus } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
-import SimpleDatePicker from "../ui/CustomCalendar";
+import SimpleDatePicker from "../ui/customCalendar";
 
 interface TaskFilterForm {
   statuses: TaskStatus[];
