@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PaymentStatus } from '@/types';
-import SimpleDatePicker from '../ui/CustomCalendar';
+import SimpleDatePicker from '../ui/customCalendar';
 import { debounce } from 'lodash';
 
 const paymentSchema = z.object({
