@@ -26,7 +26,7 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({ open, onOpenChange,
     taskId: '',
     amount: 0,
     status: 'due',
-    dueDate: undefined, // Null for new payments
+    dueDate: undefined,
     invoiceNumber: '',
     notes: '',
   });
@@ -46,20 +46,32 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({ open, onOpenChange,
     }
   }, []);
 
-  const fetchTasks = useCallback(async (clientId: string) => {
-    if (!clientId) return [];
+  const fetchTasks = useCallback(async (clientId: string, retryCount = 0) => {
+    if (!clientId) {
+      console.log('No clientId provided for fetchTasks');
+      return [];
+    }
     setIsLoadingTasks(true);
     try {
+      console.log('Fetching tasks for clientId:', clientId);
       const { data, error } = await supabase.from('tasks').select('id, title').eq('client_id', clientId).order('title', { ascending: true });
       if (error) throw error;
+      console.log('Fetched tasks for client:', clientId, 'Tasks:', data);
       setTasks(data ?? []);
       return data ?? [];
-    } catch (err) {
-      console.error('Fetch tasks error:', err);
+    } catch (err: any) {
+      console.error('Fetch tasks error:', err.message, 'ClientId:', clientId);
+      if (retryCount < 1) {
+        console.warn('Retrying fetchTasks... Attempt:', retryCount + 1);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return fetchTasks(clientId, retryCount + 1);
+      }
       toast.error('Failed to load tasks');
+      setTasks([]);
       return [];
     } finally {
       setIsLoadingTasks(false);
+      console.log('isLoadingTasks set to false');
     }
   }, []);
 
@@ -78,12 +90,15 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({ open, onOpenChange,
           invoiceNumber: data.invoice_number || '',
           notes: data.notes || '',
         };
-        // Fetch tasks and wait for them to load
-        const tasks = await fetchTasks(data.client_id);
-        console.log('Fetched payment:', data, 'Tasks:', tasks); // Debug
+        let tasks = await fetchTasks(data.client_id);
+        console.log('Fetched payment:', data, 'Tasks:', tasks);
+        if (!tasks.some(t => t.id === data.task_id)) {
+          console.warn('Task ID not found in tasks, refetching...');
+          tasks = await fetchTasks(data.client_id);
+        }
         setDefaultValues(paymentValues);
-        // Reset form after tasks are loaded
         formRef.current?.reset(paymentValues);
+        console.log('Form reset with:', paymentValues);
       }
     } catch (err) {
       console.error('Fetch payment error:', err);
@@ -93,6 +108,16 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({ open, onOpenChange,
 
   useEffect(() => {
     if (open) {
+      setTasks([]);
+      setDefaultValues({
+        clientId: '',
+        taskId: '',
+        amount: 0,
+        status: 'due',
+        dueDate: undefined,
+        invoiceNumber: '',
+        notes: '',
+      });
       fetchClients();
       if (isEditing) {
         fetchPayment();
@@ -102,13 +127,13 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({ open, onOpenChange,
           taskId: '',
           amount: 0,
           status: 'due',
-          dueDate: undefined, // Null for new payments
+          dueDate: undefined,
           invoiceNumber: '',
           notes: '',
         };
         setDefaultValues(initialValues);
-        setTasks([]);
         formRef.current?.reset(initialValues);
+        console.log('Add mode reset with:', initialValues);
       }
     } else {
       const initialValues = {
@@ -135,7 +160,7 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({ open, onOpenChange,
         task_id: values.taskId,
         amount: values.amount,
         status: values.status,
-        due_date: values.dueDate ? values.dueDate.toISOString() : null, // Handle null dueDate
+        due_date: values.dueDate ? values.dueDate.toISOString() : null,
         invoice_number: values.invoiceNumber || null,
         notes: values.notes || null,
         updated_at: new Date().toISOString(),

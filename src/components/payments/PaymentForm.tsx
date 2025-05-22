@@ -11,7 +11,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PaymentStatus } from '@/types';
@@ -22,7 +21,7 @@ const paymentSchema = z.object({
   taskId: z.string().min(1, 'Task is required'),
   amount: z.coerce.number().positive('Amount must be positive'),
   status: z.enum(['due', 'invoiced', 'pending', 'received', 'overdue', 'canceled']),
-  dueDate: z.date({ required_error: 'Due date is required' }).optional(), // Allow null
+  dueDate: z.date({ required_error: 'Due date is required' }).optional(),
   invoiceNumber: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -54,7 +53,7 @@ const PaymentForm = forwardRef<PaymentFormRef, PaymentFormProps>(
         taskId: '',
         amount: 0,
         status: 'due',
-        dueDate: undefined, // Null for new payments
+        dueDate: undefined,
         invoiceNumber: '',
         notes: '',
       },
@@ -75,10 +74,18 @@ const PaymentForm = forwardRef<PaymentFormRef, PaymentFormProps>(
     useImperativeHandle(ref, () => ({
       submit: () => form.handleSubmit(onSubmit)(),
       reset: (values) => {
-        console.log('Resetting form with:', values); // Debug
+        console.log('Resetting form with:', values, 'Tasks:', tasks);
         form.reset(values);
       },
     }));
+
+    // Reset form when defaultValues change in edit mode
+    useEffect(() => {
+      if (isEditing) {
+        console.log('Default values changed:', defaultValues);
+        form.reset(defaultValues);
+      }
+    }, [defaultValues, isEditing, form]);
 
     // Debug form errors
     useEffect(() => {
@@ -90,12 +97,12 @@ const PaymentForm = forwardRef<PaymentFormRef, PaymentFormProps>(
     // Watch clientId and fetch tasks when it changes
     const selectedClientId = form.watch('clientId');
     useEffect(() => {
-      if (selectedClientId && !isEditing && !isLoadingTasks) {
-        console.log('Client changed to:', selectedClientId, 'Current taskId:', form.getValues('taskId'));
-        form.setValue('taskId', ''); // Reset taskId only in add mode
+      if (selectedClientId && !isEditing && !isLoadingTasks && tasks.length > 0) {
+        console.log('Client changed to:', selectedClientId, 'Current taskId:', form.getValues('taskId'), 'Tasks:', tasks);
+        form.setValue('taskId', '');
         onClientChange?.(selectedClientId);
       }
-    }, [selectedClientId, onClientChange, form, isEditing, isLoadingTasks]);
+    }, [selectedClientId, onClientChange, form, isEditing, isLoadingTasks, tasks]);
 
     return (
       <Form {...form}>
