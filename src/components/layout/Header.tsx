@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -52,7 +51,6 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, sidebarOpen }) => {
               className="h-8 mr-3"
             />
           )}
-          {/* <h1 className="text-xl font-semibold text-gray-800">Anthem Infotech</h1> */}
         </div>
       </div>
       
@@ -66,6 +64,9 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, sidebarOpen }) => {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative rounded-full h-8 w-8 p-0">
               <Avatar>
+                {user?.avatar_url ? (
+                  <AvatarImage src={user.avatar_url} alt="User Profile"  className="object-cover w-full h-full"/>
+                ) : null}
                 <AvatarFallback className="bg-anthem-purple text-white">
                   {initials}
                 </AvatarFallback>
