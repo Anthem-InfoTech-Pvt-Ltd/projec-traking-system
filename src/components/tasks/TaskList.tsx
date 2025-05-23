@@ -183,7 +183,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, onStatusCh
         <TableHeader>
           <TableRow>
             <TableHead>Title</TableHead>
-            <TableHead>Client</TableHead>
+            {isClient ? null : <TableHead>Client</TableHead>}
             <TableHead>Due Date</TableHead>
             <TableHead>Estimated Hours</TableHead>
             <TableHead>Estimated Cost</TableHead>
@@ -202,7 +202,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, onStatusCh
             paginatedTasks.map((task) => (
               <TableRow key={task.id}>
                 <TableCell className="font-medium">{task.title}</TableCell>
-                <TableCell>{getClientName(task.clientId)}</TableCell>
+                {isClient ? null : <TableCell>{getClientName(task.clientId)}</TableCell>}
                 <TableCell>{task.dueDate ? format(task.dueDate, 'PPP') : '-'}</TableCell>
                 <TableCell>{task.estimatedHours}</TableCell>
                 <TableCell>${task.estimatedCost}</TableCell>

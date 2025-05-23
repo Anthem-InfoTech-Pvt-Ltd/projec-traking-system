@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -24,18 +24,144 @@ const SettingsPage: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    role: "",
+    avatar_url: "",
+  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const { user } = useAuth();
 
-    const handlePasswordReset = async () => {
+  useEffect(() => {
+    if (user) {
+      const fetchUserProfile = async () => {
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (error) {
+          console.error("Error fetching user profile:", error);
+          return;
+        }
+
+        if (data) {
+          setProfileData({
+            name: data.name || user.user_metadata?.name || "",
+            email: data.email || user.email || "",
+            phone: data.phone || "",
+            role: data.role || "",
+            avatar_url: data.avatar_url || user.user_metadata?.avatar_url || "",
+          });
+        }
+      };
+
+      fetchUserProfile();
+    }
+  }, [user]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const uploadToCloudinary = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "projectclientmanagemnetsystem");
+
+    try {
+      const response = await fetch(
+        "https://api.cloudinary.com/v1_1/dmyq2ymj9/image/upload",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+      return data.secure_url;
+    } catch (error) {
+      console.error("Error uploading to Cloudinary:", error);
+      throw error;
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingProfile(true);
+
+    try {
+      let avatarUrl = profileData.avatar_url;
+
+      // Upload new avatar if selected
+      if (selectedFile) {
+        avatarUrl = await uploadToCloudinary(selectedFile);
+        // Immediately update the local state with the new URL
+        setProfileData((prev) => ({ ...prev, avatar_url: avatarUrl }));
+      }
+
+      // Update user profile in Supabase
+      const updates = {
+        id: user?.id,
+        name: profileData.name,
+        email: profileData.email,
+        phone: profileData.phone,
+        role: profileData.role,
+        avatar_url: avatarUrl,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase.from("users").upsert(updates);
+
+      if (error) throw error;
+
+      if (profileData.email !== user?.email) {
+        const { error: authError } = await supabase.auth.updateUser({
+          email: profileData.email,
+        });
+
+        if (authError) throw authError;
+      }
+
+      toast.success("Profile updated successfully");
+      setSelectedFile(null); // Clear the selected file after successful upload
+      setUploadProgress(0);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update profile");
+    } finally {
+      setIsSubmittingProfile(false);
+    }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!newPassword || !confirmPassword) {
+      toast.error("Please fill in both password fields");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       toast.error("Passwords do not match");
       return;
     }
 
     try {
-      setIsSubmitting(true);
+      setIsSubmittingPassword(true);
 
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
@@ -51,23 +177,16 @@ const SettingsPage: React.FC = () => {
     } catch (err: any) {
       toast.error(err.message || "Failed to reset password");
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingPassword(false);
     }
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast.success("Profile settings saved");
-  };
-
-  const handleSaveNotifications = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast.success("Notification preferences saved");
-  };
-
-  const handleSaveAppearance = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast.success("Appearance settings saved");
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setProfileData((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
   };
 
   return (
@@ -107,18 +226,55 @@ const SettingsPage: React.FC = () => {
               <form onSubmit={handleSaveProfile} className="space-y-6">
                 <div className="flex flex-col md:flex-row gap-6 items-start">
                   <div className="flex flex-col items-center space-y-2">
-                    <Avatar className="w-24 h-24">
-                      <AvatarImage
-                        src="/placeholder.svg"
-                        alt={user?.name || "User"}
+                    <div className="w-24 h-24 rounded-full overflow-hidden border border-gray-300 relative">
+                      <Avatar className="w-full h-full">
+                        {/* Show selected file preview OR saved avatar URL */}
+                        {selectedFile ? (
+                          <AvatarImage
+                            src={URL.createObjectURL(selectedFile)}
+                            className="object-cover w-full h-full"
+                          />
+                        ) : (
+                          <AvatarImage
+                            src={profileData.avatar_url || "/placeholder.svg"}
+                            className="object-cover w-full h-full"
+                          />
+                        )}
+                        <AvatarFallback>
+                          {profileData.name?.charAt(0) || "U"}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      {uploadProgress > 0 && uploadProgress < 100 && (
+                        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                          <span className="text-white text-sm font-medium">
+                            {uploadProgress}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type="file"
+                        id="avatar-upload"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleFileChange}
                       />
-                      <AvatarFallback>
-                        {user?.name?.substring(0, 2) || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <Button variant="outline" size="sm">
-                      Change Avatar
-                    </Button>
+                      <Label
+                        htmlFor="avatar-upload"
+                        className="text-sm bg-blue-900 px-3 py-2 rounded hover:underline text-white cursor-pointer"
+                      >
+                        {selectedFile ? "Change Image" : "Change Avatar"}
+                      </Label>
+                    </div>
+
+                    {selectedFile && (
+                      <p className="text-xs text-muted-foreground text-center max-w-[150px] truncate">
+                        {selectedFile.name}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex-1 space-y-4">
@@ -127,7 +283,9 @@ const SettingsPage: React.FC = () => {
                         <Label htmlFor="name">Full Name</Label>
                         <Input
                           id="name"
-                          defaultValue={user?.name || "Admin User"}
+                          value={profileData.name}
+                          onChange={handleProfileChange}
+                          required
                         />
                       </div>
                       <div className="space-y-2">
@@ -135,7 +293,9 @@ const SettingsPage: React.FC = () => {
                         <Input
                           id="email"
                           type="email"
-                          defaultValue={user?.email || "admin@example.com"}
+                          value={profileData.email}
+                          onChange={handleProfileChange}
+                          required
                         />
                       </div>
                       <div className="space-y-2">
@@ -143,14 +303,16 @@ const SettingsPage: React.FC = () => {
                         <Input
                           id="phone"
                           type="tel"
-                          defaultValue="(555) 123-4567"
+                          value={profileData.phone}
+                          onChange={handleProfileChange}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="role">Role</Label>
                         <Input
                           id="role"
-                          defaultValue="Administrator"
+                          value={profileData.role}
+                          onChange={handleProfileChange}
                           disabled
                         />
                       </div>
@@ -158,264 +320,177 @@ const SettingsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <Separator />
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={isSubmittingProfile}>
+                    {isSubmittingProfile ? "Saving..." : "Save Profile"}
+                  </Button>
+                </div>
+              </form>
 
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Password</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* New Password */}
-                    <div className="space-y-2">
-                      <Label htmlFor="new-password">New Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="new-password"
-                          type={showNewPassword ? "text" : "password"}
-                          className="pr-10"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowNewPassword((prev) => !prev)}
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground"
-                          tabIndex={-1}
-                        >
-                          {showNewPassword ? (
-                            <EyeOff className="h-5 w-5" />
-                          ) : (
-                            <Eye className="h-5 w-5" />
-                          )}
-                        </button>
-                      </div>
+              <Separator className="my-6" />
+
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <h3 className="text-lg font-medium">Change Password</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">New Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="new-password"
+                        type={showNewPassword ? "text" : "password"}
+                        className="pr-10"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        minLength={6}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword((prev) => !prev)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground"
+                        tabIndex={-1}
+                      >
+                        {showNewPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
+                      </button>
                     </div>
+                  </div>
 
-                    {/* Confirm New Password */}
-                    <div className="space-y-2">
-                      <Label htmlFor="confirm-password">
-                        Confirm New Password
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          id="confirm-password"
-                          type={showConfirmPassword ? "text" : "password"}
-                          className="pr-10"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setShowConfirmPassword((prev) => !prev)
-                          }
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground"
-                          tabIndex={-1}
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="h-5 w-5" />
-                          ) : (
-                            <Eye className="h-5 w-5" />
-                          )}
-                        </button>
-                      </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">
+                      Confirm New Password
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="confirm-password"
+                        type={showConfirmPassword ? "text" : "password"}
+                        className="pr-10"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        minLength={6}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground"
+                        tabIndex={-1}
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
-              </form>
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button variant="outline" className="mr-2">
-                Cancel
-              </Button>
-              <Button
-                onClick={(e) => {
-                  e.preventDefault();
-                  handlePasswordReset();
-                }}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Saving..." : "Save Changes"}
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>
-                Manage how and when you receive notifications.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSaveNotifications} className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Email Notifications</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="email-tasks">Task Updates</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive emails when tasks are updated or completed.
-                        </p>
-                      </div>
-                      <Switch id="email-tasks" defaultChecked />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="email-clients">Client Activity</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive emails about client actions and feedback.
-                        </p>
-                      </div>
-                      <Switch id="email-clients" defaultChecked />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="email-payments">Payment Updates</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive emails about payment status changes.
-                        </p>
-                      </div>
-                      <Switch id="email-payments" defaultChecked />
-                    </div>
-                  </div>
-
-                  <h3 className="text-lg font-medium mt-6">
-                    In-App Notifications
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="app-tasks">Task Updates</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive notifications when tasks are updated or
-                          completed.
-                        </p>
-                      </div>
-                      <Switch id="app-tasks" defaultChecked />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="app-clients">Client Activity</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive notifications about client actions and
-                          feedback.
-                        </p>
-                      </div>
-                      <Switch id="app-clients" defaultChecked />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="app-payments">Payment Updates</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive notifications about payment status changes.
-                        </p>
-                      </div>
-                      <Switch id="app-payments" defaultChecked />
-                    </div>
-                  </div>
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={isSubmittingPassword}>
+                    {isSubmittingPassword ? "Updating..." : "Update Password"}
+                  </Button>
                 </div>
               </form>
             </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button variant="outline" className="mr-2">
-                Reset to Default
-              </Button>
-              <Button onClick={handleSaveNotifications}>
-                Save Preferences
-              </Button>
-            </CardFooter>
           </Card>
         </TabsContent>
 
-        <TabsContent value="appearance">
-          <Card>
-            <CardHeader>
-              <CardTitle>Appearance Settings</CardTitle>
-              <CardDescription>
-                Customize the look and feel of the application.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSaveAppearance} className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Theme</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex flex-col items-center space-y-2 p-4 border rounded-lg hover:bg-accent cursor-pointer">
-                      <div className="h-20 w-full bg-background border rounded-md"></div>
-                      <span className="text-sm font-medium">Light</span>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-2 p-4 border rounded-lg hover:bg-accent cursor-pointer bg-accent">
-                      <div className="h-20 w-full bg-gray-900 border rounded-md"></div>
-                      <span className="text-sm font-medium">Dark</span>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-2 p-4 border rounded-lg hover:bg-accent cursor-pointer">
-                      <div className="h-20 w-full bg-gradient-to-b from-background to-gray-900 border rounded-md"></div>
-                      <span className="text-sm font-medium">System</span>
-                    </div>
-                  </div>
-
-                  <h3 className="text-lg font-medium mt-6">Sidebar</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="collapsed-sidebar">
-                          Collapsed by default
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Start with a collapsed sidebar when you login.
-                        </p>
-                      </div>
-                      <Switch id="collapsed-sidebar" />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="sticky-sidebar">Sticky sidebar</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Keep the sidebar fixed when scrolling.
-                        </p>
-                      </div>
-                      <Switch id="sticky-sidebar" defaultChecked />
-                    </div>
-                  </div>
-
-                  <h3 className="text-lg font-medium mt-6">Density</h3>
-                  <div className="space-y-1">
-                    <Label>Interface density</Label>
-                    <div className="grid grid-cols-3 gap-2 mt-2">
-                      <Button variant="outline" className="justify-center">
-                        Compact
-                      </Button>
-                      <Button variant="secondary" className="justify-center">
-                        Default
-                      </Button>
-                      <Button variant="outline" className="justify-center">
-                        Comfortable
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button variant="outline" className="mr-2">
-                Reset to Default
-              </Button>
-              <Button onClick={handleSaveAppearance}>Save Settings</Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
+        {/* ... (keep the existing notifications and appearance tabs) ... */}
       </Tabs>
     </div>
   );
 };
 
 export default SettingsPage;
+
+// <TabsContent value="notifications">
+//           <Card>
+//             <CardHeader>
+//               <CardTitle>Notification Preferences</CardTitle>
+//               <CardDescription>Manage how and when you receive notifications.</CardDescription>
+//             </CardHeader>
+//             <CardContent>
+//               <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+//                 <div className="space-y-4">
+//                   <h3 className="text-lg font-medium">Email Notifications</h3>
+//                   <div className="space-y-4">
+//                     <div className="flex items-center justify-between">
+//                       <div className="space-y-0.5">
+//                         <Label htmlFor="email-tasks">Task Updates</Label>
+//                         <p className="text-sm text-muted-foreground">
+//                           Receive emails when tasks are updated or completed.
+//                         </p>
+//                       </div>
+//                       <Switch id="email-tasks" defaultChecked />
+//                     </div>
+//                     <Separator />
+//                     <div className="flex items-center justify-between">
+//                       <div className="space-y-0.5">
+//                         <Label htmlFor="email-clients">Client Activity</Label>
+//                         <p className="text-sm text-muted-foreground">
+//                           Receive emails about client actions and feedback.
+//                         </p>
+//                       </div>
+//                       <Switch id="email-clients" defaultChecked />
+//                     </div>
+//                     <Separator />
+//                     <div className="flex items-center justify-between">
+//                       <div className="space-y-0.5">
+//                         <Label htmlFor="email-payments">Payment Updates</Label>
+//                         <p className="text-sm text-muted-foreground">
+//                           Receive emails about payment status changes.
+//                         </p>
+//                       </div>
+//                       <Switch id="email-payments" defaultChecked />
+//                     </div>
+//                   </div>
+//                 </div>
+//               </form>
+//             </CardContent>
+//             <CardFooter className="flex justify-end">
+//               <Button variant="outline" className="mr-2">
+//                 Reset to Default
+//               </Button>
+//               <Button>Save Preferences</Button>
+//             </CardFooter>
+//           </Card>
+//         </TabsContent>
+
+//         <TabsContent value="appearance">
+//           <Card>
+//             <CardHeader>
+//               <CardTitle>Appearance Settings</CardTitle>
+//               <CardDescription>Customize the look and feel of the application.</CardDescription>
+//             </CardHeader>
+//             <CardContent>
+//               <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+//                 <div className="space-y-4">
+//                   <h3 className="text-lg font-medium">Theme</h3>
+//                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+//                     <div className="flex flex-col items-center space-y-2 p-4 border rounded-lg hover:bg-accent cursor-pointer">
+//                       <div className="h-20 w-full bg-background border rounded-md"></div>
+//                       <span className="text-sm font-medium">Light</span>
+//                     </div>
+//                     <div className="flex flex-col items-center space-y-2 p-4 border rounded-lg hover:bg-accent cursor-pointer bg-accent">
+//                       <div className="h-20 w-full bg-gray-900 border rounded-md"></div>
+//                       <span className="text-sm font-medium">Dark</span>
+//                     </div>
+//                     <div className="flex flex-col items-center space-y-2 p-4 border rounded-lg hover:bg-accent cursor-pointer">
+//                       <div className="h-20 w-full bg-gradient-to-b from-background to-gray-900 border rounded-md"></div>
+//                       <span className="text-sm font-medium">System</span>
+//                     </div>
+//                   </div>
+//                 </div>
+//               </form>
+//             </CardContent>
+//             <CardFooter className="flex justify-end">
+//               <Button variant="outline" className="mr-2">
+//                 Reset to Default
+//               </Button>
+//               <Button>Save Settings</Button>
+//             </CardFooter>
+//           </Card>
+//         </TabsContent>
