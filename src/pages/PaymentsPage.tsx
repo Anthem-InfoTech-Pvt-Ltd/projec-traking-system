@@ -29,7 +29,7 @@ const PaymentsPage: React.FC = () => {
 
       let query = supabase.from('payments').select('*');
       if (!isAdmin && clientId) {
-        query = query.eq('client_id', clientId).in('status', ['invoiced', 'overdue', 'pending']);
+        query = query.eq('client_id', clientId).in('status', ['due', 'invoiced', 'pending', 'received', 'overdue', 'canceled']);
       }
       const { data, error } = await query;
       if (error) throw error;
