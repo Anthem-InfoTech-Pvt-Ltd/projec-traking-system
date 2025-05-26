@@ -147,11 +147,11 @@ const LoginPage: React.FC = () => {
           </form>
         </CardContent>
         <CardFooter>
-          <div className="text-center text-sm text-muted-foreground w-full">
+          {/* <div className="text-center text-sm text-muted-foreground w-full">
             <p>Demo Credentials</p>
-            <p>Admin: admin@antheminfotech.com / any password</p>
-            <p>Client: client@example.com / any password</p>
-          </div>
+            <p>Admin: admin@antheminfotech.com</p>
+            <p>Client: priyanka@antheminfotech.com</p>
+          </div> */}
         </CardFooter>
       </Card>
     </div>

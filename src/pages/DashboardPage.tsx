@@ -1,11 +1,12 @@
 import React from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, FileText, DollarSign, CheckCircle, AlertCircle } from 'lucide-react';
+import { Users, FileText, DollarSign, CheckCircle, AlertCircle, Pencil, Trash2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
-
+import { format, formatDistanceToNow } from 'date-fns';
+import DashboardHighlights from '@/components/dashboard/DashboardHighlights';
+import PaymentReminder from '@/components/dashboard/PaymentReminder';
 // Spinner Component
 const Spinner = () => (
   <div className="flex justify-center items-center py-4">
@@ -17,7 +18,6 @@ const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   let clientId = user?.app_metadata?.clientId;
-
   console.log('User:', user);
 
   // Timeout utility
@@ -473,7 +473,7 @@ const DashboardPage: React.FC = () => {
                 ) : (
                   <>
                     <div className="text-2xl font-bold">{stat.value}</div>
-                    <p className="text-xs text-muted-foreground mt-1">Compared to last month</p>
+                    {/* <p className="text-xs text-muted-foreground mt-1">Compared to last month</p> */}
                   </>
                 )}
               </CardContent>
@@ -621,92 +621,7 @@ const DashboardPage: React.FC = () => {
 
         {/* Recent Activities and Upcoming Deadlines (static) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Activities</CardTitle>
-              <CardDescription>Latest updates from your projects</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-4">
-                  <div className="bg-blue-100 p-2 rounded-full">
-                    <CheckCircle className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Task completed</p>
-                    <p className="text-sm text-muted-foreground">Website redesign for Client XYZ</p>
-                    <p className="text-xs text-muted-foreground">2 hours ago</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-4">
-                  <div className="bg-purple-100 p-2 rounded-full">
-                    <DollarSign className="h-5 w-5 text-purple-500" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Payment received</p>
-                    <p className="text-sm text-muted-foreground">$1,200 from Client ABC</p>
-                    <p className="text-xs text-muted-foreground">Yesterday</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-4">
-                  <div className="bg-amber-100 p-2 rounded-full">
-                    <FileText className="h-5 w-5 text-amber-500" />
-                  </div>
-                  <div>
-                    <p className="font-medium">New task created</p>
-                    <p className="text-sm text-muted-foreground">Mobile app development for Client LMN</p>
-                    <p className="text-xs text-muted-foreground">2 days ago</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Upcoming Deadlines</CardTitle>
-              <CardDescription>Tasks and payments due soon</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-4">
-                  <div className="bg-red-100 p-2 rounded-full">
-                    <AlertCircle className="h-5 w-5 text-red-500" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <p className="font-medium">E-commerce website</p>
-                      <span className="text-sm text-red-500 font-medium">Tomorrow</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Client PQR</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-4">
-                  <div className="bg-amber-100 p-2 rounded-full">
-                    <DollarSign className="h-5 w-5 text-amber-500" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <p className="font-medium">Invoice #INV-2023-042</p>
-                      <span className="text-sm text-amber-500 font-medium">3 days</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Client ABC - $2,500</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-4">
-                  <div className="bg-blue-100 p-2 rounded-full">
-                    <FileText className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <p className="font-medium">CRM Integration</p>
-                      <span className="text-sm text-blue-500 font-medium">Next week</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Client XYZ</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+         <DashboardHighlights user={user} clientId={clientId} isAdmin={isAdmin} />
         </div>
       </div>
     );
@@ -741,6 +656,10 @@ const DashboardPage: React.FC = () => {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+
+            <div>
+              {clientId && <PaymentReminder clientId={clientId} />}
             </div>
 
             <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
@@ -782,6 +701,7 @@ const DashboardPage: React.FC = () => {
                 </CardContent>
               </Card>
             </div>
+
           </>
         )}
       </div>

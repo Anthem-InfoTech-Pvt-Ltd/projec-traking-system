@@ -285,7 +285,7 @@ const SettingsPage: React.FC = () => {
                         <Label htmlFor="name">Full Name</Label>
                         <Input
                           id="name"
-                          value={profileData.name}
+                          value={profileData.name.charAt(0).toUpperCase() + profileData.name.slice(1)}
                           onChange={handleProfileChange}
                           required
                         />
@@ -313,7 +313,7 @@ const SettingsPage: React.FC = () => {
                         <Label htmlFor="role">Role</Label>
                         <Input
                           id="role"
-                          value={profileData.role}
+                          value={profileData.role.charAt(0).toUpperCase() + profileData.role.slice(1)}
                           onChange={handleProfileChange}
                           disabled
                         />

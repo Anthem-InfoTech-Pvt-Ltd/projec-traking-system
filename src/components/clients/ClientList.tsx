@@ -393,7 +393,7 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
           ) : (
             paginatedClients.map((client) => (
               <TableRow key={client.id} className={getRowColor(client.status)}>
-                <TableCell className="font-medium">{client.name}</TableCell>
+                <TableCell className="font-medium">{client.name.charAt(0).toUpperCase() + client.name.slice(1)}</TableCell>
                 <TableCell>{client.email}</TableCell>
                 <TableCell>{client.phone}</TableCell>
                 <TableCell>

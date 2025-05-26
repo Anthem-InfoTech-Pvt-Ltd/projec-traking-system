@@ -4,6 +4,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useIsMobile } from '@/hooks/use-mobile';
+// import { Footer } from './Footer';
 
 const AppLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -21,6 +22,7 @@ const AppLayout: React.FC = () => {
         <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6">
           <Outlet />
         </main>
+      {/* <Footer/> */}
       </div>
     </div>
   );

@@ -190,7 +190,7 @@ const TaskList: React.FC<TaskListProps> = ({
 
   const getClientName = (clientId: string) => {
     const client = clients.find((c) => c.id === clientId);
-    return client ? client.name : "Unknown";
+    return client ? client.name.charAt(0).toUpperCase() + client.name.slice(1) : "Unknown";
   };
 
   const getStatusColor = (status: TaskStatus) => {
@@ -256,9 +256,9 @@ const TaskList: React.FC<TaskListProps> = ({
             paginatedTasks.map((task) => (
               <TableRow key={task.id}>
                 <TableCell className="font-medium">
-                  {task.title}
+                 {task.title.charAt(0).toUpperCase() + task.title.slice(1)}
                   <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                      {task.description}
+                      {task.description.charAt(0).toUpperCase() + task.description.slice(1)}
                     </p>
                   </TableCell>
                 {isClient ? null : (

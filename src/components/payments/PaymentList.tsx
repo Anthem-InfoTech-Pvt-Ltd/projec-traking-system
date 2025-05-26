@@ -100,8 +100,17 @@ const PaymentList: React.FC<PaymentListProps> = ({ payments, onEdit, onDelete })
 
   useEffect(() => setCurrentPage(1), [payments]);
 
-  const getClientName = useCallback((clientId: string) => clients.find(c => c.id === clientId)?.name || 'Unknown', [clients]);
-  const getTaskTitle = useCallback((taskId: string) => tasks.find(t => t.id === taskId)?.title || 'Unknown', [tasks]);
+  const getClientName = useCallback(
+  (clientId: string) => {
+    const name = clients.find((t) => t.id === clientId)?.name;
+    return name ? name.charAt(0).toUpperCase() + name.slice(1) : "Unknown";
+  }, [clients]);
+  const getTaskTitle = useCallback(
+  (taskId: string) => {
+    const title = tasks.find((t) => t.id === taskId)?.title;
+    return title ? title.charAt(0).toUpperCase() + title.slice(1) : "Unknown";
+  },
+  [tasks]);
 
   const initiatePayment = useCallback((payment: Payment) => {
     setSelectedPayment(payment);
