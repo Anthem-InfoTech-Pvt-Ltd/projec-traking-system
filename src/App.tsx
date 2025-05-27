@@ -22,6 +22,7 @@ import NotificationsPage from "./pages/NotificationsPage";
 import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 import InvoicesPage from "./pages/InvoicesPage";
+import { NotificationProvider } from "./context/NotificationContext";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -92,6 +93,7 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <NotificationProvider>
         <TooltipProvider>
           <Toaster />
           <Sonner />
@@ -99,6 +101,7 @@ const App = () => {
             <AppRoutes />
           </BrowserRouter>
         </TooltipProvider>
+        </NotificationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

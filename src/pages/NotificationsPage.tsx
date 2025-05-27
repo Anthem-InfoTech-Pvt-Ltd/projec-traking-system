@@ -9,84 +9,16 @@ import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { supabase } from '../integrations/supabase/client'; // adjust path
 import { useAuth } from '@/context/AuthContext';
+import { useNotification } from '@/context/NotificationContext';
 
 const NotificationsPage: React.FC = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-   const { user } = useAuth();
-   const isAdmin = user?.role === "admin";
-   const isClient = user?.role === "client";
-  const userId = user.id;
-  const clientId = user.clientId;
-  console.log("login User:", user);
-
-const fetchNotifications = async () => {
-  setLoading(true);
-
-  let query = supabase.from("notifications").select("*").order("created_at", { ascending: false });
-
-  // Filter based on role
-  if (isAdmin) {
-    query = query.eq("receiver_role", "admin");
-  } else if (isClient) {
-    query = query.eq("receiver_role", "client").eq("receiver_id", clientId);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    toast.error("Failed to load notifications");
-  } else {
-    setNotifications(data);
-  }
-  setLoading(false);
-};
-
-  const markAsRead = async (id: string) => {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('id', id);
-
-    if (!error) {
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-      );
-      toast.success('Notification marked as read');
-    }
-  };
-
-  const markAllAsRead = async () => {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('read', false); // update all unread
-
-    if (!error) {
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-      toast.success('All notifications marked as read');
-    }
-  };
-
-  const formatNotificationTime = (date: string) => {
-    const parsedDate = new Date(date);
-    const now = new Date();
-    const diffInHours = (now.getTime() - parsedDate.getTime()) / (1000 * 60 * 60);
-
-    if (diffInHours < 24) {
-      return format(parsedDate, 'h:mm a');
-    } else if (diffInHours < 48) {
-      return 'Yesterday';
-    } else {
-      return format(parsedDate, 'MMM d');
-    }
-  };
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
+  const {
+  notifications,
+  loading,
+  unreadCount,
+  markAsRead,
+  markAllAsRead,
+} = useNotification();
 
   return (
     <div className="space-y-6">

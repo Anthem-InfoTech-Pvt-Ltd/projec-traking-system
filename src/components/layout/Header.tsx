@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
+import { useNotification } from "@/context/NotificationContext";
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -22,46 +23,14 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ toggleSidebar, sidebarOpen }) => {
   const { user, logout } = useAuth();
   const isMobile = useIsMobile();
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  const initials = user?.name
+  const { unreadCount } = useNotification();
+ const initials = user?.name
     ? user.name
         .split(" ")
         .map((n) => n[0])
         .join("")
         .toUpperCase()
     : "U";
-
-useEffect(() => {
-  const fetchUnreadCount = async () => {
-    if (!user?.id) return;
-
-    let query = supabase
-      .from("notifications")
-      .select("*", { count: "exact", head: true })
-      .eq("read", false);
-
-    if (user.role === "admin") {
-      query = query.eq("receiver_role", "admin");
-    } else if (user.role === "client") {
-      query = query
-        .eq("receiver_id", user.clientId)
-        .eq("receiver_role", "client");
-    }
-
-    const { count, error } = await query;
-
-    if (error) {
-      console.error("Failed to fetch unread count:", error.message);
-      return;
-    }
-
-    setUnreadCount(count ?? 0);
-  };
-
-  fetchUnreadCount();
-}, [user]);
-
 
   return (
     <header className="bg-white shadow-sm z-10 h-16 flex items-center justify-between px-4 md:px-6">
