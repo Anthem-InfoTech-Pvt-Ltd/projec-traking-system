@@ -23,6 +23,8 @@ import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 import InvoicesPage from "./pages/InvoicesPage";
 import { NotificationProvider } from "./context/NotificationContext";
+import { Success } from "./components/payments/Success";
+import { Cancel } from "./components/payments/Cancel";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -78,6 +80,8 @@ const AppRoutes = () => {
         />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="payments" element={<PaymentsPage />} />
+        <Route path="payments/success" element={<Success />} />
+        <Route path="payments/cancel" element={<Cancel />} />
         <Route path="invoices" element={<InvoicesPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="settings" element={<SettingsPage />} />
