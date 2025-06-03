@@ -1,28 +1,55 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Edit, MoreVertical, Trash2, Send, UserPlus, Eye, EyeOff } from 'lucide-react';
-import { toast } from 'sonner';
-import { supabase } from '../../integrations/supabase/client';
-import { Client, ClientStatus } from '@/types';
-import CustomPagination from '@/components/CustomPagination';
-import DeleteDialog from '../../components/DeleteDialog';
-import { debounce } from 'lodash';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Edit,
+  MoreVertical,
+  Trash2,
+  Send,
+  UserPlus,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "../../integrations/supabase/client";
+import { Client, ClientStatus } from "@/types";
+import CustomPagination from "../../components/CustomPagination";
+import DeleteDialog from "../../components/DeleteDialog";
+import { debounce } from "lodash";
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number
+): Promise<T> {
   const timeout = new Promise<T>((_, reject) => {
-    setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+    setTimeout(
+      () => reject(new Error(`Operation timed out after ${timeoutMs}ms`)),
+      timeoutMs
+    );
   });
   return Promise.race([promise, timeout]);
 }
@@ -39,8 +66,9 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
   const [createAccountDialogOpen, setCreateAccountDialogOpen] = useState(false);
-  const [clientToCreateAccount, setClientToCreateAccount] = useState<Client | null>(null);
-  const [password, setPassword] = useState('');
+  const [clientToCreateAccount, setClientToCreateAccount] =
+    useState<Client | null>(null);
+  const [password, setPassword] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -55,7 +83,10 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
   // Register callback for adding clients
   useEffect(() => {
     onAddClient((newClient: Client) => {
-      setClients((prev) => [newClient, ...prev.filter((c) => c.id !== newClient.id)]);
+      setClients((prev) => [
+        newClient,
+        ...prev.filter((c) => c.id !== newClient.id),
+      ]);
     });
   }, [onAddClient]);
 
@@ -63,10 +94,11 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
   const fetchClients = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await withTimeout(
-        supabase.from('clients').select('*').order('created_at', { ascending: false }),
-        5000
-      );
+      const { data, error } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false });
       if (error) throw new Error(`Failed to fetch clients: ${error.message}`);
 
       const formatted = data.map((client: any) => ({
@@ -83,11 +115,11 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
       }));
 
       setClients(formatted);
-      console.log('Clients from Supabase:', formatted);
+      console.log("Clients from Supabase:", formatted);
     } catch (err: any) {
-      console.error('Error fetching clients:', err);
-      setError(err.message || 'Failed to load clients');
-      toast.error(err.message || 'Failed to load clients');
+      console.error("Error fetching clients:", err);
+      setError(err.message || "Failed to load clients");
+      toast.error(err.message || "Failed to load clients");
     } finally {
       setLoading(false);
     }
@@ -100,17 +132,17 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
   // Real-time subscription
   useEffect(() => {
     const subscription = supabase
-      .channel('clients_changes')
+      .channel("clients_changes")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'clients',
+          event: "*",
+          schema: "public",
+          table: "clients",
         },
         (payload) => {
-          console.log('Real-time client event:', payload);
-          if (payload.eventType === 'INSERT') {
+          console.log("Real-time client event:", payload);
+          if (payload.eventType === "INSERT") {
             const newClient: Client = {
               id: payload.new.id,
               name: payload.new.name,
@@ -123,8 +155,11 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
               createdAt: new Date(payload.new.created_at),
               updatedAt: new Date(payload.new.updated_at),
             };
-            setClients((prev) => [newClient, ...prev.filter((c) => c.id !== newClient.id)]);
-          } else if (payload.eventType === 'UPDATE') {
+            setClients((prev) => [
+              newClient,
+              ...prev.filter((c) => c.id !== newClient.id),
+            ]);
+          } else if (payload.eventType === "UPDATE") {
             const updatedClient: Client = {
               id: payload.new.id,
               name: payload.new.name,
@@ -140,99 +175,116 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
             setClients((prev) =>
               prev.map((c) => (c.id === updatedClient.id ? updatedClient : c))
             );
-          } else if (payload.eventType === 'DELETE') {
-            console.log('Processing DELETE event for client:', payload.old.id);
+          } else if (payload.eventType === "DELETE") {
+            console.log("Processing DELETE event for client:", payload.old.id);
             setClients((prev) => {
-              const updatedClients = prev.filter((c) => c.id !== payload.old.id);
-              console.log('Clients after DELETE event:', updatedClients);
+              const updatedClients = prev.filter(
+                (c) => c.id !== payload.old.id
+              );
+              console.log("Clients after DELETE event:", updatedClients);
               return updatedClients;
             });
           }
         }
       )
       .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Subscribed to clients table changes');
+        if (status === "SUBSCRIBED") {
+          console.log("Subscribed to clients table changes");
         } else if (err) {
-          console.error('Subscription error:', err);
-          toast({
-            title: "Error",
-            description: "Failed to subscribe to client updates. Changes may not reflect in real-time.",
-            variant: "destructive",
-          });
+          console.error("Subscription error:", err);
+          toast.error(
+            "Failed to subscribe to client updates. Changes may not reflect in real-time."
+          );
         }
       });
 
     return () => {
-      console.log('Unsubscribing from clients table changes');
+      console.log("Unsubscribing from clients table changes");
       supabase.removeChannel(subscription);
     };
   }, []);
 
   const getStatusColor = (status: ClientStatus) => {
     const colorMap: Record<ClientStatus, string> = {
-      idle: 'bg-amber-100 text-amber-800 hover:bg-amber-200',
-      gone: 'bg-red-100 text-red-800 hover:bg-red-200',
-      active: 'bg-green-100 text-green-800 hover:bg-green-200',
+      idle: "bg-amber-100 text-amber-800 hover:bg-amber-200",
+      gone: "bg-red-100 text-red-800 hover:bg-red-200",
+      active: "bg-green-100 text-green-800 hover:bg-green-200",
     };
-    return colorMap[status] || 'bg-gray-100 text-gray-800 hover:bg-gray-200';
+    return colorMap[status] || "bg-gray-100 text-gray-800 hover:bg-gray-200";
   };
 
   const getRowColor = (status: ClientStatus) => {
     const colorMap: Record<ClientStatus, string> = {
-      idle: 'border-l-4 border-l-amber-500',
-      gone: 'border-l-4 border-l-red-500',
-      active: 'border-l-4 border-l-green-500',
+      idle: "border-l-4 border-l-amber-500",
+      gone: "border-l-4 border-l-red-500",
+      active: "border-l-4 border-l-green-500",
     };
-    return colorMap[status] || '';
+    return colorMap[status] || "";
   };
 
   const confirmDelete = (id: string) => {
-    console.log('Opening delete dialog for client:', id);
+    console.log("Opening delete dialog for client:", id);
     setClientToDelete(id);
     debouncedSetDeleteDialogOpen(true);
   };
 
   const handleDelete = async () => {
     if (!clientToDelete) {
-      console.warn('handleDelete called with no clientToDelete');
+      console.warn("handleDelete called with no clientToDelete");
       debouncedSetDeleteDialogOpen(false);
       return;
     }
     setIsProcessing(true);
     try {
-      // Optimistic update
       const previousClients = clients;
-      setClients((prev) => {
-        const updatedClients = prev.filter((c) => c.id !== clientToDelete);
-        console.log('Optimistically removed client:', clientToDelete, 'New clients:', updatedClients);
-        return updatedClients;
-      });
+      const { data: clientTasks, error: taskError } = await supabase
+        .from("tasks")
+        .select("id")
+        .eq("client_id", clientToDelete);
 
-      const { error } = await withTimeout(
-        supabase.from('clients').delete().eq('id', clientToDelete),
-        5000
-      );
+      if (taskError) {
+        throw new Error("Failed to check for associated tasks.");
+      }
+
+      if (clientTasks.length > 0) {
+        toast.error("Cannot delete client: they have associated tasks.");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("clients")
+        .update({ is_deleted: "TRUE" })
+        .eq("id", clientToDelete);
       if (error) {
-        setClients(previousClients); // Revert on error
         throw new Error(`Failed to delete client: ${error.message}`);
       }
-      toast.success('Client deleted successfully');
+      setClients((prev) => {
+        const updatedClients = prev.filter((c) => c.id !== clientToDelete);
+        console.log(
+          "Optimistically removed client:",
+          clientToDelete,
+          "New clients:",
+          updatedClients
+        );
+        return updatedClients;
+      });
+      toast.success("Client deleted successfully");
       debouncedSetDeleteDialogOpen(false);
       setClientToDelete(null);
     } catch (err: any) {
-      console.error('Error deleting client:', err);
-      toast.error(err.message || 'Failed to delete client');
+      console.error("Error deleting client:", err);
+      toast.error(err.message || "Failed to delete client");
       debouncedSetDeleteDialogOpen(false);
       setClientToDelete(null);
     } finally {
       setIsProcessing(false);
-      console.log('Delete operation completed for client');
+      console.log("Delete operation completed for client");
     }
   };
 
   const generateRandomPassword = (length = 10) => {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    const chars =
+      "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
     let password = "";
     for (let i = 0; i < length; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -256,60 +308,70 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
 
     setIsProcessing(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/client/resend-credentials`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: clientToCreateAccount.email,
-          password,
-          name: clientToCreateAccount.name,
-          client_id: clientToCreateAccount.id,
-        }),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/api/client/resend-credentials`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: clientToCreateAccount.email,
+            password,
+            name: clientToCreateAccount.name,
+            client_id: clientToCreateAccount.id,
+          }),
+        }
+      );
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to create account');
+      if (!response.ok)
+        throw new Error(data.message || "Failed to create account");
 
-      toast.success('Account created and credentials sent');
+      toast.success("Account created and credentials sent");
       setClients((prev) =>
         prev.map((c) =>
           c.id === clientToCreateAccount.id ? { ...c, hasAccount: true } : c
         )
       );
       setCreateAccountDialogOpen(false);
-      setPassword('');
+      setPassword("");
     } catch (err: any) {
-      console.error('Account creation error:', err);
-      toast.error(err.message || 'Failed to create account');
+      console.error("Account creation error:", err);
+      toast.error(err.message || "Failed to create account");
     } finally {
       setIsProcessing(false);
     }
   };
-  
+
   const handleResendCredentials = async (client: Client) => {
     if (!client.email) {
-      toast.error('Email is missing');
+      toast.error("Email is missing");
       return;
     }
 
     setIsProcessing(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/client/resend-credentials-only`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: client.email,
-          name: client.name,
-        }),
-      });
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_BACKEND_URL
+        }/api/client/resend-credentials-only`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: client.email,
+            name: client.name,
+          }),
+        }
+      );
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to resend credentials');
+      if (!response.ok)
+        throw new Error(data.message || "Failed to resend credentials");
 
-      toast.success('Credentials resent successfully');
+      toast.success("Credentials resent successfully");
     } catch (err: any) {
-      console.error('Error resending credentials:', err);
-      toast.error(err.message || 'Failed to resend credentials');
+      console.error("Error resending credentials:", err);
+      toast.error(err.message || "Failed to resend credentials");
     } finally {
       setIsProcessing(false);
     }
@@ -331,34 +393,51 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead><Skeleton className="h-6 w-24" /></TableHead>
-              <TableHead><Skeleton className="h-6 w-32" /></TableHead>
-              <TableHead><Skeleton className="h-6 w-24" /></TableHead>
-              <TableHead><Skeleton className="h-6 w-20" /></TableHead>
-              <TableHead><Skeleton className="h-6 w-24" /></TableHead>
-              <TableHead className="text-right"><Skeleton className="h-6 w-16 ml-auto" /></TableHead>
+              <TableHead>
+                <Skeleton className="h-6 w-24" />
+              </TableHead>
+              <TableHead>
+                <Skeleton className="h-6 w-32" />
+              </TableHead>
+              <TableHead>
+                <Skeleton className="h-6 w-24" />
+              </TableHead>
+              <TableHead>
+                <Skeleton className="h-6 w-20" />
+              </TableHead>
+              <TableHead>
+                <Skeleton className="h-6 w-24" />
+              </TableHead>
+              <TableHead className="text-right">
+                <Skeleton className="h-6 w-16 ml-auto" />
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {[...Array(rowsPerPage)].map((_, index) => (
               <TableRow key={index}>
-                <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
-                <TableCell className="text-right"><Skeleton className="h-4 w-[40px] ml-auto" /></TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-[150px]" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-[200px]" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-[100px]" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-[80px]" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-[100px]" />
+                </TableCell>
+                <TableCell className="text-right">
+                  <Skeleton className="h-4 w-[40px] ml-auto" />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-        <CustomPagination
-          totalItems={0}
-          rowsPerPage={rowsPerPage}
-          setRowsPerPage={setRowsPerPage}
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
-        />
       </div>
     );
   }
@@ -381,36 +460,50 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
             <TableRow>
               <TableCell colSpan={6} className="text-center text-red-600">
                 <p>{error}</p>
-                <Button onClick={() => fetchClients()} className="mt-4">Retry</Button>
+                <Button onClick={() => fetchClients()} className="mt-4">
+                  Retry
+                </Button>
               </TableCell>
             </TableRow>
           ) : paginatedClients.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+              <TableCell
+                colSpan={6}
+                className="text-center py-10 text-muted-foreground"
+              >
                 No clients found.
               </TableCell>
             </TableRow>
           ) : (
             paginatedClients.map((client) => (
               <TableRow key={client.id} className={getRowColor(client.status)}>
-                <TableCell className="font-medium">{client.name.charAt(0).toUpperCase() + client.name.slice(1)}</TableCell>
+                <TableCell className="font-medium">
+                  {client.name.charAt(0).toUpperCase() + client.name.slice(1)}
+                </TableCell>
                 <TableCell>{client.email}</TableCell>
                 <TableCell>{client.phone}</TableCell>
                 <TableCell>
                   <Button
                     variant="ghost"
-                    className={`rounded-full px-2.5 text-xs font-semibold ${getStatusColor(client.status)}`}
+                    className={`rounded-full px-2.5 text-xs font-semibold ${getStatusColor(
+                      client.status
+                    )}`}
                     disabled={isProcessing}
                   >
-                    {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
+                    {client.status.charAt(0).toUpperCase() +
+                      client.status.slice(1)}
                   </Button>
                 </TableCell>
                 <TableCell>
                   <Badge
                     variant="outline"
-                    className={client.hasAccount ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}
+                    className={
+                      client.hasAccount
+                        ? "bg-blue-100 text-blue-800"
+                        : "bg-gray-100 text-gray-800"
+                    }
                   >
-                    {client.hasAccount ? 'Has Account' : 'No Account'}
+                    {client.hasAccount ? "Has Account" : "No Account"}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
@@ -429,15 +522,21 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
                       <DropdownMenuItem onClick={() => onEdit(client.id)}>
                         <Edit className="mr-2 h-4 w-4" /> Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => confirmDelete(client.id)}>
+                      <DropdownMenuItem
+                        onClick={() => confirmDelete(client.id)}
+                      >
                         <Trash2 className="mr-2 h-4 w-4" /> Delete
                       </DropdownMenuItem>
                       {client.hasAccount ? (
-                        <DropdownMenuItem onClick={() => handleResendCredentials(client)}>
+                        <DropdownMenuItem
+                          onClick={() => handleResendCredentials(client)}
+                        >
                           <Send className="mr-2 h-4 w-4" /> Resend Credentials
                         </DropdownMenuItem>
                       ) : (
-                        <DropdownMenuItem onClick={() => openCreateAccountDialog(client)}>
+                        <DropdownMenuItem
+                          onClick={() => openCreateAccountDialog(client)}
+                        >
                           <UserPlus className="mr-2 h-4 w-4" /> Create Account
                         </DropdownMenuItem>
                       )}
@@ -464,21 +563,34 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
         isProcessing={isProcessing}
       />
       {createAccountDialogOpen && (
-        <Dialog open={createAccountDialogOpen} onOpenChange={setCreateAccountDialogOpen}>
+        <Dialog
+          open={createAccountDialogOpen}
+          onOpenChange={setCreateAccountDialogOpen}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create Client Account</DialogTitle>
               <DialogDescription>
-                Create an account for <strong>{clientToCreateAccount?.name}</strong>. Credentials will be emailed to <strong>{clientToCreateAccount?.email}</strong>.
+                Create an account for{" "}
+                <strong>{clientToCreateAccount?.name}</strong>. Credentials will
+                be emailed to <strong>{clientToCreateAccount?.email}</strong>.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium" htmlFor="username">Email</label>
-                <Input id="username" value={clientToCreateAccount?.email || ''} disabled />
+                <label className="text-sm font-medium" htmlFor="username">
+                  Email
+                </label>
+                <Input
+                  id="username"
+                  value={clientToCreateAccount?.email || ""}
+                  disabled
+                />
               </div>
               <div className="relative">
-                <label className="text-sm font-medium" htmlFor="password">Password</label>
+                <label className="text-sm font-medium" htmlFor="password">
+                  Password
+                </label>
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -499,10 +611,17 @@ const ClientList: React.FC<ClientListProps> = ({ onEdit, onAddClient }) => {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setCreateAccountDialogOpen(false)} disabled={isProcessing}>
+              <Button
+                variant="outline"
+                onClick={() => setCreateAccountDialogOpen(false)}
+                disabled={isProcessing}
+              >
                 Cancel
               </Button>
-              <Button onClick={handleCreateAccount} disabled={!password || isProcessing}>
+              <Button
+                onClick={handleCreateAccount}
+                disabled={!password || isProcessing}
+              >
                 Create & Send
               </Button>
             </DialogFooter>

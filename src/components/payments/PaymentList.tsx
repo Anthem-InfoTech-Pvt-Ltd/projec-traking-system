@@ -253,16 +253,12 @@ const PaymentList: React.FC<PaymentListProps> = ({
     try {
       // Optimistic update
       onDelete(paymentToDelete);
-      const { error } = await withTimeout(
-        supabase.from("payments").update({is_deleted: 'TRUE'}).eq("id", paymentToDelete),
-        5000
-      );
+      const { error } = await supabase.from("payments").update({is_deleted: 'TRUE'}).eq("id", paymentToDelete);
       if (error) throw error;
       toast.success("Payment deleted");
     } catch (error: any) {
       console.error("Delete error:", error.message);
       toast.error("Failed to delete payment");
-      // Revert optimistic update if needed (optional, since real-time will handle)
     } finally {
       setIsProcessing(false);
       setPaymentToDelete(null);

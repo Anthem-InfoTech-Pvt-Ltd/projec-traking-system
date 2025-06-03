@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle } from "lucide-react";
-import axios from "axios";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Success = () => {
   const [searchParams] = useSearchParams();
@@ -10,25 +10,68 @@ export const Success = () => {
   const [verified, setVerified] = useState(false);
 
   useEffect(() => {
-    const sessionId = searchParams.get("session_id");
-    if (sessionId) {
-      verifyPayment(sessionId);
-    } else {
-      setLoading(false);
-    }
+    const handleVerification = async () => {
+      const sessionId = searchParams.get("session_id");
+      const paymentId = searchParams.get("paymentId");
+
+      if (!sessionId || !paymentId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data: paymentData, error: paymentFetchError } = await supabase
+          .from("payments")
+          .select("task_id, client_id")
+          .eq("id", paymentId)
+          .single();
+
+        if (paymentFetchError || !paymentData) {
+          throw paymentFetchError || new Error("Payment not found");
+        }
+
+        const { task_id, client_id } = paymentData;
+
+        const [{ data: taskData }, { data: clientData }] = await Promise.all([
+          supabase
+            .from("tasks")
+            .select("title")
+            .eq("id", task_id)
+            .eq("is_deleted", false)
+            .single(),
+          supabase
+            .from("clients")
+            .select("name")
+            .eq("id", client_id)
+            .eq("is_deleted", false)
+            .single(),
+        ]);
+
+        const taskTitle = taskData?.title || "Unknown Task";
+        const clientName = clientData?.name || "Unknown Client";
+
+        await verifyPayment(sessionId, taskTitle, clientName);
+      } catch (err) {
+        console.error("Verification error:", err.message);
+        setLoading(false);
+      }
+    };
+
+    handleVerification();
   }, []);
 
-  const verifyPayment = async (sessionId) => {
+  const verifyPayment = async (sessionId, taskTitle, clientName) => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_BACKEND_URL}/api/payments/verify`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId }),
+          body: JSON.stringify({ sessionId, taskTitle, clientName }),
           credentials: "include",
         }
       );
+
       const data = await res.json();
 
       if (data.success) {
@@ -58,11 +101,9 @@ export const Success = () => {
       </div>
     );
   }
+
   return (
-    <div
-      className="flex items-center justify-center"
-      style={{ minHeight: "82vh" }}
-    >
+    <div className="flex items-center justify-center min-h-[82vh]">
       <div className="bg-white p-8 rounded-lg shadow text-center max-w-md w-full">
         <CheckCircle className="text-green-700 mx-auto h-16 w-16 mb-4" />
         <h1 className="text-3xl font-bold text-green-700 mb-2">

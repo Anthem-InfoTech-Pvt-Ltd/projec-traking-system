@@ -43,7 +43,6 @@ const upcoming = reminders.filter((r) => {
   
   return (
       days <= 7 && 
-      days >= 0 && 
       (status === "pending" || status === "invoiced")
     );
 });

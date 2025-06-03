@@ -30,6 +30,7 @@ interface ClientFormProps {
 }
 
 export interface ClientFormRef {
+  reset: (values: Partial<ClientFormValues>) => void;
   submit: () => void;
 }
 
@@ -56,6 +57,7 @@ const ClientForm = forwardRef<ClientFormRef, ClientFormProps>(
 
     useImperativeHandle(ref, () => ({
       submit: () => form.handleSubmit(onSubmit)(),
+      reset: (values) => form.reset(values),
     }));
 
     // Debug form errors

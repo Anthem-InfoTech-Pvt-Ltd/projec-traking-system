@@ -38,7 +38,7 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({ open, onOpenChange,
   const fetchClients = useCallback(async () => {
     setIsLoadingClients(true);
     try {
-      const { data, error } = await supabase.from('clients').select('id, name').order('name', { ascending: true });
+      const { data, error } = await supabase.from('clients').select('id, name').eq("is_deleted", false).order('name', { ascending: true });
       if (error) throw error;
       setClients(data ?? []);
     } catch (err) {
@@ -56,7 +56,7 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({ open, onOpenChange,
     }
     setIsLoadingTasks(true);
     try {
-      const { data, error } = await supabase.from('tasks').select('id, title').eq('client_id', clientId).order('title', { ascending: true });
+      const { data, error } = await supabase.from('tasks').select('id, title').eq('client_id', clientId).eq("is_deleted", false).order('title', { ascending: true });
       if (error) throw error;
       console.log('Fetched tasks for client:', clientId, 'Tasks:', data);
       setTasks(data ?? []);
@@ -73,7 +73,7 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({ open, onOpenChange,
   const fetchPayment = useCallback(async () => {
     if (!paymentId) return;
     try {
-      const { data, error } = await supabase.from('payments').select('*').eq('id', paymentId).single();
+      const { data, error } = await supabase.from('payments').select('*').eq('id', paymentId).eq("is_deleted", false).single();
       if (error) throw error;
       if (data) {
         const paymentValues = {
@@ -151,6 +151,7 @@ const onSubmit = async (values: {
         .from('payments')
         .update(payload)
         .eq('id', paymentId)
+        .eq("is_deleted", false)
         .select()
         .single();
 
@@ -176,6 +177,7 @@ const onSubmit = async (values: {
         .from('payments')
         .insert([payload])
         .select()
+        .eq("is_deleted", false)
         .single();
 
       if (error) throw error;
@@ -205,6 +207,7 @@ const onSubmit = async (values: {
       receiver_id: values.clientId,
       receiver_role: "client",
       sender_role: "admin",
+      type: "payment",
       title: isEditing ? "Payment Updated" : "New Payment Recorded",
       message: isEditing
         ? `A payment for task "${taskTitle}" has been updated.`

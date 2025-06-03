@@ -411,7 +411,7 @@ const DashboardPage: React.FC = () => {
       <div key={payment.id} className="p-4 border-b last:border-b-0">
         <div className="flex justify-between">
           <div>
-            <h3 className="font-medium text-gray-900">Invoice #{payment.invoice_number || payment.id.slice(-5)}</h3>
+            <h3 className="font-medium text-gray-900">Invoice #{payment.invoice_number || payment.id.slice(-8)}</h3>
             <p className="text-sm text-gray-500 mt-1">
               For: {clientTasks?.find(task => task.id === payment.task_id)?.title || 'Unknown Task'}
             </p>
@@ -427,7 +427,6 @@ const DashboardPage: React.FC = () => {
           <div>Due: {payment.due_date ? format(payment.due_date, 'MMM d, yyyy') : 'Not set'}</div>
           {payment.status !== 'received' && (
             <button
-              onClick={() => handlePayInvoice(payment)}
               className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium py-1 px-2 rounded"
             >
               Pay Now
@@ -436,10 +435,6 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
     );
-  };
-
-  const handlePayInvoice = (payment: any) => {
-    window.open(`https://www.paypal.com/checkoutnow?token=demo-${payment.id}`, '_blank');
   };
 
   if (isAdmin) {

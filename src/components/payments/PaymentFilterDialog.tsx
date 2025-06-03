@@ -91,6 +91,7 @@ const PaymentFilterDialog: React.FC<PaymentFilterDialogProps> = ({
           const { data, error } = await supabase
             .from("clients")
             .select("id, name")
+            .eq("is_deleted", false)
             .order("name", { ascending: true });
           if (error) {
             console.error("Supabase error fetching clients:", error);

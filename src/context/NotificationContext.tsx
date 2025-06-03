@@ -20,20 +20,38 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [loading, setLoading] = useState(true);
 
   const fetchNotifications = async () => {
+    // console.log("fetching notification");
     if (!user?.id) return;
 
     setLoading(true);
 
+    const { data: userData, error: userError } = await supabase.from("users").select("notification_preferences").eq("id", user.id);
+    const preferences=userData[0].notification_preferences;
+    // console.log(" preferences", preferences);
     let query = supabase
-      .from("notifications")
-      .select("*")
-      .order("created_at", { ascending: false });
-
+    .from("notifications")
+    .select("*")
+    .order("created_at", { ascending: false });
+    
     if (user.role === "admin") {
       query = query.eq("receiver_role", "admin");
     } else if (user.role === "client") {
       query = query.eq("receiver_role", "client").eq("receiver_id", user.clientId);
     }
+
+      // 🔍 Filter based on preferences
+  const allowedTypes = [];
+  if (preferences.app_tasks) allowedTypes.push("task");
+  if (preferences.app_clients) allowedTypes.push("client");
+  if (preferences.app_payments) allowedTypes.push("payment");
+
+  if (allowedTypes.length > 0) {
+    query = query.in("type", allowedTypes);
+  } else {
+    setNotifications([]);
+    setLoading(false);
+    return;
+  }
 
     const { data, error } = await query;
     if (!error) setNotifications(data ?? []);
@@ -68,9 +86,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   useEffect(() => {
     fetchNotifications();
-
-    // Optional: real-time sync with polling or Supabase Realtime
-    const interval = setInterval(fetchNotifications, 30000); // every 30s
+    const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, [user]);
 

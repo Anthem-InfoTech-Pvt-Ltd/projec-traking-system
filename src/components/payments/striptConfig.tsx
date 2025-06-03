@@ -1,6 +1,0 @@
-export const STRIPE_PUBLISHABLE_KEY =
-  "pk_test_51OZsFnSHVmksIjgkdCWfTEJ4DMrGstpFMeMFE0d88cPrENqzLBa1cj8aNai7ZmJwa37ilgN0hI0OkgsA1O9D5bML00JUe7HaIg";
-export const STRIPE_SECRET_KEY =
-  "sk_test_51OZsFnSHVmksIjgkW3r9bAFSCZU4s7JiIK0dkKMjTQkzoCxCeN6AhRjpLTPviioRmvmc3QfTNefCF5wObcaN41Kl00XiyrfuQZ";
-export const STRIPE_WEBHOOK_SECRET = "we_1R9JdbSHVmksIjgkw6IBUh8R";
-export const STRIPE_API_VERSION = "2023-10-16";

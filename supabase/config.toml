@@ -24,7 +24,7 @@ file_size_limit = "50MiB"
 
 [auth]
 enabled = true
-site_url = "http://localhost:3000"
+site_url = "http://:3000"
 
 [analytics]
 enabled = false

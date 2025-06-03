@@ -15,14 +15,14 @@ interface MarkPaidDialogProps {
   open: boolean;
   onClose: () => void;
   paymentId: string | null;
-  onMarkedPaid: () => void;
+  onSuccess: () => void;
 }
 
 const MarkPaidDialog: React.FC<MarkPaidDialogProps> = ({
   open,
   onClose,
   paymentId,
-  onMarkedPaid,
+  onSuccess,
 }) => {
   const [transactionId, setTransactionId] = useState("");
   const [documentType, setDocumentType] = useState("");
@@ -52,6 +52,7 @@ const MarkPaidDialog: React.FC<MarkPaidDialogProps> = ({
         (documentType === "image" && !isImage)
       ) {
         toast.error(`Please upload a valid ${documentType} file.`);
+        setIsSubmitting(false); 
         return;
       }
 
@@ -78,7 +79,7 @@ const MarkPaidDialog: React.FC<MarkPaidDialogProps> = ({
     const { data: paymentData, error: paymentFetchError } = await supabase
       .from("payments")
       .select("task_id, client_id")
-      .eq("id", paymentId)
+      .eq("id", paymentId).eq("is_deleted", false)
       .single();
 
     if (paymentFetchError || !paymentData) {
@@ -89,8 +90,8 @@ const MarkPaidDialog: React.FC<MarkPaidDialogProps> = ({
 
     // 4. Fetch client and task
     const [{ data: taskData }, { data: clientData }] = await Promise.all([
-      supabase.from("tasks").select("title").eq("id", task_id).single(),
-      supabase.from("clients").select("name").eq("id", client_id).single(),
+      supabase.from("tasks").select("title").eq("id", task_id).eq("is_deleted", false).single(),
+      supabase.from("clients").select("name").eq("id", client_id).eq("is_deleted", false).single(),
     ]);
 
     const taskTitle = taskData?.title || "Unknown Task";
@@ -107,7 +108,7 @@ const MarkPaidDialog: React.FC<MarkPaidDialogProps> = ({
         document_url: documentUrl,
         document_type: documentType || null,
       })
-      .eq("id", paymentId);
+      .eq("id", paymentId).eq("is_deleted", false);
 
     if (paymentUpdateError) throw paymentUpdateError;
 
@@ -117,6 +118,7 @@ const MarkPaidDialog: React.FC<MarkPaidDialogProps> = ({
       .insert({
         receiver_role: "admin",
         sender_role: "client",
+        type: "payment",
         title: "Payment Received",
         message: `Payment received from ${clientName} for task "${taskTitle}".`,
         triggered_by: user.id,
@@ -125,7 +127,7 @@ const MarkPaidDialog: React.FC<MarkPaidDialogProps> = ({
     if (notificationError) throw notificationError;
 
     toast.success("Payment marked as paid.");
-    onMarkedPaid();
+    onSuccess();
     onClose();
     setTransactionId("");
     setDocumentType("");
@@ -153,6 +155,7 @@ const MarkPaidDialog: React.FC<MarkPaidDialogProps> = ({
           <input
             type="text"
             id="transactionId"
+            required
             value={transactionId}
             onChange={(e) => setTransactionId(e.target.value)}
             className="w-full border rounded px-2 py-2"

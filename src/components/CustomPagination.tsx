@@ -44,8 +44,8 @@ const CustomPagination = ({ totalItems, rowsPerPage, setRowsPerPage, currentPage
           disabled={currentPage === 1}
           className={`p-2 rounded border ${
             currentPage === 1
-              ? "text-gray-400 border-gray-200"
-              : "hover:bg-blue-600 hover:text-white border-gray-300"
+              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+              : "border-2 text-black hover:opacity-90"
           }`}
         >
           <ChevronsLeft />
@@ -55,8 +55,8 @@ const CustomPagination = ({ totalItems, rowsPerPage, setRowsPerPage, currentPage
           disabled={currentPage === totalPages}
           className={`p-2 rounded border ${
             currentPage === totalPages
-              ? "text-gray-400 border-gray-200"
-              : "hover:bg-blue-600 hover:text-white border-gray-300"
+              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+              : "border-2 text-black hover:opacity-90"
           }`}
         >
           <ChevronsRight />

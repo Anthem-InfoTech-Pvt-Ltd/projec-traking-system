@@ -1,12 +1,17 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from "react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
-import { supabase } from '../../integrations/supabase/client';
-import ClientForm, { ClientFormRef } from './ClientForm';
-import { Client, ClientStatus } from '@/types';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { supabase } from "../../integrations/supabase/client";
+import ClientForm, { ClientFormRef } from "./ClientForm";
+import { Client, ClientStatus } from "@/types";
 
 interface AddClientDialogProps {
   open: boolean;
@@ -33,12 +38,12 @@ const AddClientDialog: React.FC<AddClientDialogProps> = ({
     status: ClientStatus;
     notes?: string;
   }>({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    status: 'active',
-    notes: '',
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    status: "active",
+    notes: "",
   });
   const formRef = useRef<ClientFormRef>(null);
 
@@ -47,37 +52,41 @@ const AddClientDialog: React.FC<AddClientDialogProps> = ({
       const fetchClient = async () => {
         setLoading(true);
         const { data, error } = await supabase
-          .from('clients')
-          .select('*')
-          .eq('id', clientId)
+          .from("clients")
+          .select("*")
+          .eq("id", clientId)
+          .eq("is_deleted", false)
           .single();
 
         if (error || !data) {
-          toast.error('Failed to load client');
+          toast.error("Failed to load client");
           setLoading(false);
           return;
         }
 
-        setDefaultValues({
+        const values = {
           name: data.name,
           email: data.email,
           phone: data.phone,
           address: data.address,
           status: data.status,
-          notes: data.notes || '',
-        });
+          notes: data.notes || "",
+        };
+
+        setDefaultValues(values);
+        formRef.current?.reset(values);
         setLoading(false);
       };
 
       fetchClient();
     } else {
       setDefaultValues({
-        name: '',
-        email: '',
-        phone: '',
-        address: '',
-        status: 'active',
-        notes: '',
+        name: "",
+        email: "",
+        phone: "",
+        address: "",
+        status: "active",
+        notes: "",
       });
     }
   }, [clientId, isEditing]);
@@ -91,28 +100,31 @@ const AddClientDialog: React.FC<AddClientDialogProps> = ({
     notes?: string;
   }) => {
     setLoading(true);
+
     const payload = {
       ...values,
-      updated_at: new Date().toISOString(),
-      created_at: new Date().toISOString(), // Ensure created_at is set for new clients
+      updated_at: new Date(),
+      ...(isEditing ? {} : { created_at: new Date().toISOString() }),
     };
 
     try {
       if (isEditing && clientId) {
         const { error } = await supabase
-          .from('clients')
+          .from("clients")
           .update(payload)
-          .eq('id', clientId);
+          .eq("id", clientId);
 
         if (error) throw new Error(`Failed to update client: ${error.message}`);
-        toast.success('Client updated successfully');
+        toast.success("Client updated successfully");
       } else {
         const { data, error } = await supabase
-          .from('clients')
+          .from("clients")
           .insert([payload])
           .select()
           .single();
+
         if (error) throw new Error(`Failed to add client: ${error.message}`);
+
         if (data && onAddClient) {
           const newClient: Client = {
             id: data.id,
@@ -124,17 +136,19 @@ const AddClientDialog: React.FC<AddClientDialogProps> = ({
             hasAccount: data.has_account || false,
             notes: data.notes,
             createdAt: new Date(data.created_at),
-            updatedAt: new Date(data.updated_at),
+            updated_at: new Date(data.updated_at),
           };
           onAddClient(newClient);
         }
-        toast.success('Client added successfully');
+
+        toast.success("Client added successfully");
       }
+
       onOpenChange(false);
       onClientSaved();
     } catch (err: any) {
-      console.error('Client save error:', err);
-      toast.error(err.message || 'Failed to save client');
+      console.error("Client save error:", err);
+      toast.error(err.message || "Failed to save client");
     } finally {
       setLoading(false);
     }
@@ -144,11 +158,13 @@ const AddClientDialog: React.FC<AddClientDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] w-full max-w-lg max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Client' : 'Add New Client'}</DialogTitle>
+          <DialogTitle>
+            {isEditing ? "Edit Client" : "Add New Client"}
+          </DialogTitle>
           <DialogDescription>
             {isEditing
-              ? 'Update the client information below.'
-              : 'Fill in the client information to add a new client.'}
+              ? "Update the client information below."
+              : "Fill in the client information to add a new client."}
           </DialogDescription>
         </DialogHeader>
         <ClientForm
@@ -158,17 +174,27 @@ const AddClientDialog: React.FC<AddClientDialogProps> = ({
           isLoading={loading}
         />
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
             Cancel
           </Button>
           <Button
             onClick={() => {
-              console.log('Submitting ClientForm');
+              console.log("Submitting ClientForm");
               formRef.current?.submit();
             }}
             disabled={loading}
           >
-            {loading ? (isEditing ? 'Updating...' : 'Adding...') : (isEditing ? 'Update Client' : 'Add Client')}
+            {loading
+              ? isEditing
+                ? "Updating..."
+                : "Adding..."
+              : isEditing
+              ? "Update Client"
+              : "Add Client"}
           </Button>
         </DialogFooter>
       </DialogContent>

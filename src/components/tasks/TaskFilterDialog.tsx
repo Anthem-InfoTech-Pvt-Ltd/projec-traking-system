@@ -103,6 +103,7 @@ const TaskFilterDialog: React.FC<TaskFilterDialogProps> = ({
           const { data, error } = await supabase
             .from("clients")
             .select("id, name")
+            .eq("is_deleted", false)
             .order("name", { ascending: true });
           if (error) throw error;
           setClients(data || []);

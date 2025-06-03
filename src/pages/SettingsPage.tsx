@@ -5,19 +5,19 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Bell, Moon, Settings, User, Eye, EyeOff } from "lucide-react";
+import { Bell, Settings, User, Eye, EyeOff } from "lucide-react";
 import { supabase } from "../integrations/supabase/client";
+import { Notifications } from "@/components/settings/Notifications";
+import { Appearance } from "@/components/settings/Appearance";
 
 const SettingsPage: React.FC = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -173,6 +173,19 @@ const SettingsPage: React.FC = () => {
         throw new Error(error.message);
       }
 
+      if (user.role === "client") {
+        await supabase.from("notifications").insert({
+          receiver_id: user?.clientId,
+          receiver_role: "client",
+          sender_role: "admin",
+          type: "client",
+          title: "password Updated",
+          message:
+            "Password has been updated successfully. if you did not initiate this change, please contact support immediately.",
+          triggered_by: user?.id,
+        });
+      }
+
       toast.success("Password updated successfully");
       setNewPassword("");
       setConfirmPassword("");
@@ -230,7 +243,6 @@ const SettingsPage: React.FC = () => {
                   <div className="flex flex-col items-center space-y-2">
                     <div className="w-24 h-24 rounded-full overflow-hidden border border-gray-300 relative">
                       <Avatar className="w-full h-full">
-                        {/* Show selected file preview OR saved avatar URL */}
                         {selectedFile ? (
                           <AvatarImage
                             src={URL.createObjectURL(selectedFile)}
@@ -285,7 +297,10 @@ const SettingsPage: React.FC = () => {
                         <Label htmlFor="name">Full Name</Label>
                         <Input
                           id="name"
-                          value={profileData.name.charAt(0).toUpperCase() + profileData.name.slice(1)}
+                          value={
+                            profileData.name.charAt(0).toUpperCase() +
+                            profileData.name.slice(1)
+                          }
                           onChange={handleProfileChange}
                           required
                         />
@@ -296,6 +311,7 @@ const SettingsPage: React.FC = () => {
                           id="email"
                           type="email"
                           value={profileData.email}
+                          disabled
                           onChange={handleProfileChange}
                           required
                         />
@@ -305,6 +321,8 @@ const SettingsPage: React.FC = () => {
                         <Input
                           id="phone"
                           type="tel"
+                          maxLength={12}
+                          minLength={10}
                           value={profileData.phone}
                           onChange={handleProfileChange}
                         />
@@ -313,7 +331,10 @@ const SettingsPage: React.FC = () => {
                         <Label htmlFor="role">Role</Label>
                         <Input
                           id="role"
-                          value={profileData.role.charAt(0).toUpperCase() + profileData.role.slice(1)}
+                          value={
+                            profileData.role.charAt(0).toUpperCase() +
+                            profileData.role.slice(1)
+                          }
                           onChange={handleProfileChange}
                           disabled
                         />
@@ -401,272 +422,15 @@ const SettingsPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>
-                Manage how and when you receive notifications.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Email Notifications</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="email-tasks">Task Updates</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive emails when tasks are updated or completed.
-                        </p>
-                      </div>
-                      <Switch id="email-tasks" defaultChecked />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="email-clients">Client Activity</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive emails about client actions and feedback.
-                        </p>
-                      </div>
-                      <Switch id="email-clients" defaultChecked />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="email-payments">Payment Updates</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive emails about payment status changes.
-                        </p>
-                      </div>
-                      <Switch id="email-payments" defaultChecked />
-                    </div>
-                  </div>
-
-                  <h3 className="text-lg font-medium mt-6">
-                    In-App Notifications
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="app-tasks">Task Updates</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive notifications when tasks are updated or
-                          completed.
-                        </p>
-                      </div>
-                      <Switch id="app-tasks" defaultChecked />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="app-clients">Client Activity</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive notifications about client actions and
-                          feedback.
-                        </p>
-                      </div>
-                      <Switch id="app-clients" defaultChecked />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="app-payments">Payment Updates</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive notifications about payment status changes.
-                        </p>
-                      </div>
-                      <Switch id="app-payments" defaultChecked />
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button variant="outline" className="mr-2">
-                Reset to Default
-              </Button>
-              <Button>
-                Save Preferences
-              </Button>
-            </CardFooter>
-          </Card>
+          <Notifications />
         </TabsContent>
 
         <TabsContent value="appearance">
-          <Card>
-            <CardHeader>
-              <CardTitle>Appearance Settings</CardTitle>
-              <CardDescription>
-                Customize the look and feel of the application.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Theme</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex flex-col items-center space-y-2 p-4 border rounded-lg hover:bg-accent cursor-pointer">
-                      <div className="h-20 w-full bg-background border rounded-md"></div>
-                      <span className="text-sm font-medium">Light</span>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-2 p-4 border rounded-lg hover:bg-accent cursor-pointer bg-accent">
-                      <div className="h-20 w-full bg-gray-900 border rounded-md"></div>
-                      <span className="text-sm font-medium">Dark</span>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-2 p-4 border rounded-lg hover:bg-accent cursor-pointer">
-                      <div className="h-20 w-full bg-gradient-to-b from-background to-gray-900 border rounded-md"></div>
-                      <span className="text-sm font-medium">System</span>
-                    </div>
-                  </div>
-
-                  <h3 className="text-lg font-medium mt-6">Sidebar</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="collapsed-sidebar">
-                          Collapsed by default
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Start with a collapsed sidebar when you login.
-                        </p>
-                      </div>
-                      <Switch id="collapsed-sidebar" />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="sticky-sidebar">Sticky sidebar</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Keep the sidebar fixed when scrolling.
-                        </p>
-                      </div>
-                      <Switch id="sticky-sidebar" defaultChecked />
-                    </div>
-                  </div>
-
-                  <h3 className="text-lg font-medium mt-6">Density</h3>
-                  <div className="space-y-1">
-                    <Label>Interface density</Label>
-                    <div className="grid grid-cols-3 gap-2 mt-2">
-                      <Button variant="outline" className="justify-center">
-                        Compact
-                      </Button>
-                      <Button variant="secondary" className="justify-center">
-                        Default
-                      </Button>
-                      <Button variant="outline" className="justify-center">
-                        Comfortable
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button variant="outline" className="mr-2">
-                Reset to Default
-              </Button>
-              <Button >Save Settings</Button>
-            </CardFooter>
-          </Card>
+          <Appearance />
         </TabsContent>
-
       </Tabs>
     </div>
   );
 };
 
 export default SettingsPage;
-
-// <TabsContent value="notifications">
-//           <Card>
-//             <CardHeader>
-//               <CardTitle>Notification Preferences</CardTitle>
-//               <CardDescription>Manage how and when you receive notifications.</CardDescription>
-//             </CardHeader>
-//             <CardContent>
-//               <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
-//                 <div className="space-y-4">
-//                   <h3 className="text-lg font-medium">Email Notifications</h3>
-//                   <div className="space-y-4">
-//                     <div className="flex items-center justify-between">
-//                       <div className="space-y-0.5">
-//                         <Label htmlFor="email-tasks">Task Updates</Label>
-//                         <p className="text-sm text-muted-foreground">
-//                           Receive emails when tasks are updated or completed.
-//                         </p>
-//                       </div>
-//                       <Switch id="email-tasks" defaultChecked />
-//                     </div>
-//                     <Separator />
-//                     <div className="flex items-center justify-between">
-//                       <div className="space-y-0.5">
-//                         <Label htmlFor="email-clients">Client Activity</Label>
-//                         <p className="text-sm text-muted-foreground">
-//                           Receive emails about client actions and feedback.
-//                         </p>
-//                       </div>
-//                       <Switch id="email-clients" defaultChecked />
-//                     </div>
-//                     <Separator />
-//                     <div className="flex items-center justify-between">
-//                       <div className="space-y-0.5">
-//                         <Label htmlFor="email-payments">Payment Updates</Label>
-//                         <p className="text-sm text-muted-foreground">
-//                           Receive emails about payment status changes.
-//                         </p>
-//                       </div>
-//                       <Switch id="email-payments" defaultChecked />
-//                     </div>
-//                   </div>
-//                 </div>
-//               </form>
-//             </CardContent>
-//             <CardFooter className="flex justify-end">
-//               <Button variant="outline" className="mr-2">
-//                 Reset to Default
-//               </Button>
-//               <Button>Save Preferences</Button>
-//             </CardFooter>
-//           </Card>
-//         </TabsContent>
-
-//         <TabsContent value="appearance">
-//           <Card>
-//             <CardHeader>
-//               <CardTitle>Appearance Settings</CardTitle>
-//               <CardDescription>Customize the look and feel of the application.</CardDescription>
-//             </CardHeader>
-//             <CardContent>
-//               <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
-//                 <div className="space-y-4">
-//                   <h3 className="text-lg font-medium">Theme</h3>
-//                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-//                     <div className="flex flex-col items-center space-y-2 p-4 border rounded-lg hover:bg-accent cursor-pointer">
-//                       <div className="h-20 w-full bg-background border rounded-md"></div>
-//                       <span className="text-sm font-medium">Light</span>
-//                     </div>
-//                     <div className="flex flex-col items-center space-y-2 p-4 border rounded-lg hover:bg-accent cursor-pointer bg-accent">
-//                       <div className="h-20 w-full bg-gray-900 border rounded-md"></div>
-//                       <span className="text-sm font-medium">Dark</span>
-//                     </div>
-//                     <div className="flex flex-col items-center space-y-2 p-4 border rounded-lg hover:bg-accent cursor-pointer">
-//                       <div className="h-20 w-full bg-gradient-to-b from-background to-gray-900 border rounded-md"></div>
-//                       <span className="text-sm font-medium">System</span>
-//                     </div>
-//                   </div>
-//                 </div>
-//               </form>
-//             </CardContent>
-//             <CardFooter className="flex justify-end">
-//               <Button variant="outline" className="mr-2">
-//                 Reset to Default
-//               </Button>
-//               <Button>Save Settings</Button>
-//             </CardFooter>
-//           </Card>
-//         </TabsContent>

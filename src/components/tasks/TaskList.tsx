@@ -20,7 +20,7 @@ import { Edit, Trash2, MoreVertical, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { Task, TaskStatus } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
-import CustomPagination from "@/components/CustomPagination";
+import CustomPagination from "../../components/CustomPagination";
 import DeleteDialog from "../../components/DeleteDialog";
 import { debounce } from "lodash";
 import { toast } from "sonner";
@@ -138,7 +138,7 @@ const TaskList: React.FC<TaskListProps> = ({
       setIsLoadingClients(true);
       try {
         const { data, error } = await withTimeout(
-          supabase.from("clients").select("id, name"),
+          supabase.from("clients").select("id, name").eq("is_deleted", false),
           5000
         );
         if (error) throw new Error(`Failed to fetch clients: ${error.message}`);

@@ -1,14 +1,9 @@
-import React, { useEffect, useState } from 'react';
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from '@/components/ui/card';
-import { Notification } from '@/types';
 import { Bell, Check, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
-import { format, formatDistanceToNow } from 'date-fns';
-import { supabase } from '../integrations/supabase/client'; // adjust path
-import { useAuth } from '@/context/AuthContext';
+import { formatDistanceToNow } from 'date-fns';
 import { useNotification } from '@/context/NotificationContext';
 
 const NotificationsPage: React.FC = () => {

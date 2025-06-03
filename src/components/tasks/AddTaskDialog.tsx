@@ -38,7 +38,7 @@ const AddTaskDialog: React.FC<AddTaskDialogProps> = ({
       try {
         const { data, error } = await supabase
           .from('clients')
-          .select('id, name')
+          .select('id, name').eq("is_deleted", false)
           .order('name', { ascending: true });
 
         if (error) throw new Error(`Failed to fetch clients: ${error.message}`);
@@ -89,6 +89,7 @@ const onSubmit = async (data: {
         receiver_id: data.clientId,
         receiver_role: "client",
         sender_role: "admin",
+        type: "task",
         title: "Task Updated",
         message: `The task "${data.title}" has been updated.`,
         triggered_by: user.id,
@@ -115,6 +116,7 @@ const onSubmit = async (data: {
       await supabase.from("notifications").insert({
         receiver_id: data.clientId,
         receiver_role: "client",
+        type: "task",
         sender_role: "admin",
         title: "New Task Assigned",
         message: `A new task "${data.title}" has been created for you.`,
@@ -130,59 +132,6 @@ const onSubmit = async (data: {
     setIsSubmitting(false);
   }
 };
-
-  // const onSubmit = async (data: {
-  //   title: string;
-  //   clientId: string;
-  //   description: string;
-  //   status: string;
-  //   estimatedHours: number;
-  //   estimatedCost: number;
-  //   project_link?: string;
-  //   dueDate?: Date | null;
-  // }) => {
-  //   setIsSubmitting(true);
-  //   try {
-  //     const parsedDueDate = data.dueDate ? new Date(data.dueDate) : undefined;
-
-  //     if (taskToEdit) {
-  //       const updatedTask = {
-  //         ...taskToEdit,
-  //         title: data.title,
-  //         clientId: data.clientId,
-  //         description: data.description,
-  //         status: data.status as TaskStatus,
-  //         estimatedHours: data.estimatedHours,
-  //         estimatedCost: data.estimatedCost,
-  //         project: data.project_link || null,
-  //         dueDate: parsedDueDate,
-  //         updatedAt: new Date(),
-  //       };
-  //       await onUpdateTask(updatedTask);
-  //     } else {
-  //       const newTask = createTaskObject({
-  //         id: `task-${Date.now()}`,
-  //         title: data.title,
-  //         clientId: data.clientId,
-  //         description: data.description,
-  //         status: data.status as TaskStatus,
-  //         estimatedHours: data.estimatedHours,
-  //         estimatedCost: data.estimatedCost,
-  //         project: data.project_link,
-  //         createdAt: new Date(),
-  //         updatedAt: new Date(),
-  //         dueDate: parsedDueDate,
-  //       });
-  //       await onAddTask(newTask);
-  //     }
-  //     onClose();
-  //   } catch (error: any) {
-  //     console.error('Task save error:', error);
-  //     throw error;
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

@@ -38,7 +38,7 @@ const PaymentsPage: React.FC = () => {
       const { data, error } = await supabase
         .from('users')
         .select('client_id')
-        .eq('id', userId)
+        .eq('id', userId).eq("is_deleted", false)
         .single();
       if (error) throw error;
       return data?.client_id || null;
@@ -64,7 +64,7 @@ const PaymentsPage: React.FC = () => {
         return;
       }
 
-      let query = supabase.from('payments').select('*');
+      let query = supabase.from('payments').select('*').eq("is_deleted", false);
       if (!isAdmin && resolvedClientId) {
         query = query.eq('client_id', resolvedClientId);
       } else if (isAdmin && filters.clientId) {
