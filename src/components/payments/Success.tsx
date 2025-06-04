@@ -9,13 +9,14 @@ export const Success = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [verified, setVerified] = useState(false);
+  const { user } = useAuth();
+  console.log("User:", user);
+  const userId = user.clientId;
 
   useEffect(() => {
     const handleVerification = async () => {
       const sessionId = searchParams.get("session_id");
       const paymentId = searchParams.get("paymentId");
-      const { user } = useAuth();
-console.log("User:", user);
       if (!sessionId || !paymentId) {
         setLoading(false);
         return;

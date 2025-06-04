@@ -42,7 +42,7 @@ const upcoming = reminders.filter((r) => {
   const status = r.status?.toLowerCase(); // just to be safe
   
   return (
-      days <= 7 && 
+      days <= 10 && 
       (status === "pending" || status === "invoiced")
     );
 });
