@@ -111,7 +111,7 @@ const TaskForm = forwardRef<TaskFormRef, TaskFormProps>(
 
     return (
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-2  w-full max-w-lg sm:max-w-[600px] max-h-[70vh] overflow-y-scroll">
           <FormField
             control={form.control}
             name="title"

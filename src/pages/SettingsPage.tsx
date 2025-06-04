@@ -318,9 +318,11 @@ const SettingsPage: React.FC = () => {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="phone">Phone Number</Label>
-                        <Input
+                        <input
                           id="phone"
-                          type="tel"
+                          name="phone"
+                          type="number"
+                          className="border border-gray-100 rounded-md p-2 w-full"
                           maxLength={12}
                           minLength={10}
                           value={profileData.phone}

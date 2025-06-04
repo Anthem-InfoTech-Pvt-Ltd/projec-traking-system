@@ -108,8 +108,6 @@ const PaymentList: React.FC<PaymentListProps> = ({
   const [tasks, setTasks] = useState<{ id: string; title: string }[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<string | null>(null);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -436,59 +434,6 @@ const PaymentList: React.FC<PaymentListProps> = ({
         paymentId={selectedPaymentId}
         onSuccess={onMarkedPaid}
       />
-      {paymentDialogOpen && selectedPayment && (
-        <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Payment Confirmation</DialogTitle>
-              <DialogDescription>
-                You are about to make a payment to Anthem InfoTech Pvt Ltd.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    Invoice Number:
-                  </p>
-                  <p>{selectedPayment.invoiceNumber || "N/A"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Amount:</p>
-                  <p className="font-semibold">
-                    {formatCurrency(selectedPayment.amount)}
-                  </p>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">Recipient:</p>
-                <p>Anthem InfoTech Pvt Ltd</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  Payment Method:
-                </p>
-                <p>PayPal</p>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setPaymentDialogOpen(false)}
-                disabled={isProcessing}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => handlePayNow(selectedPayment)}
-                disabled={isProcessing}
-              >
-                Proceed to PayPal
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 };
