@@ -271,10 +271,10 @@ const SettingsPage: React.FC = () => {
             <Bell className="h-4 w-4" />
             Notifications
           </TabsTrigger>
-          <TabsTrigger value="appearance" className="flex items-center gap-2">
+          {/* <TabsTrigger value="appearance" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Appearance
-          </TabsTrigger>
+          </TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="profile">

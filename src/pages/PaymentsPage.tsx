@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Payment } from '@/types';
 import { toast } from 'sonner';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { PaymentView } from '@/components/payments/PaymentView';
 
 interface PaymentFilterForm {
   statuses: string[];
@@ -22,7 +23,9 @@ const PaymentsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
   const [paymentToEdit, setPaymentToEdit] = useState<string | null>(null);
+  const [paymentToView, setPaymentToView] = useState<string | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [filters, setFilters] = useState<PaymentFilterForm>({
@@ -122,7 +125,7 @@ useEffect(() => {
         notes: p.notes,
       }));
 
-      console.log('Fetched payments:', formattedPayments);
+      // console.log('Fetched payments:', formattedPayments);
       setPayments(formattedPayments);
     } catch (error: any) {
       console.error('Fetch payments error:', error.message);
@@ -161,7 +164,7 @@ useEffect(() => {
           (!filters.dueDateEnd || (newPayment.dueDate <= filters.dueDateEnd)) &&
           (isAdmin ? true : newPayment.clientId === clientId);
         if (matchesFilters) {
-          console.log('Adding real-time payment:', newPayment);
+          // console.log('Adding real-time payment:', newPayment);
           setPayments((prev) => [newPayment, ...prev.filter((p) => p.id !== newPayment.id)]);
         }
       })
@@ -204,11 +207,6 @@ useEffect(() => {
     setFilters(newFilters);
   }, []);
 
-  // Log user for debugging
-  useEffect(() => {
-    console.log('User object:', user);
-  }, [user]);
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -235,6 +233,7 @@ useEffect(() => {
         <CardContent>
           <PaymentList
             payments={payments}
+            onView={(id) => {setPaymentToView(id); setViewOpen(true);}}
             onEdit={(id) => { if (isAdmin) { setPaymentToEdit(id); setOpen(true); } }}
             onDelete={handlePaymentDeleted}
           />
@@ -248,6 +247,9 @@ useEffect(() => {
           onPaymentSaved={handlePaymentSaved}
         />
       )}
+
+      <PaymentView open={viewOpen} onOpenChange={setViewOpen} paymentId={paymentToView}/>
+
       <PaymentFilterDialog
         isOpen={isFilterDialogOpen}
         onClose={() => setIsFilterDialogOpen(false)}

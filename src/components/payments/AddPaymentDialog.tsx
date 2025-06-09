@@ -265,7 +265,7 @@ const AddPaymentDialog: React.FC<AddPaymentDialogProps> = ({
   return (
     <>
       {open && (
-        <div className="fixed inset-0 top-[-5vh] z-50 flex items-center justify-center max-h[105vh] bg-black bg-opacity-70">
+        <div className="fixed inset-0 z-50 flex items-center justify-center max-h[105vh] top-[-5vh] bg-black bg-opacity-70">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6">
             <div className="mb-4">
               <h2 className="text-xl font-semibold">

@@ -257,9 +257,14 @@ const PaymentForm = forwardRef<PaymentFormRef, PaymentFormProps>(
             name="notes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Notes</FormLabel>
+               <div className='flex justify-between items-center mb-2'>
+                 <FormLabel>Notes</FormLabel>
+                 <span className="text-sm text-gray-500">
+                {field.value?.length || 0} / 500
+              </span>
+               </div>
                 <FormControl>
-                  <Textarea placeholder="Any notes related to the payment..." {...field} />
+                  <Textarea placeholder="Any notes related to the payment..." {...field} maxLength={500} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

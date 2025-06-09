@@ -35,6 +35,7 @@ import {
   FileText,
   CreditCard,
   CircleCheckBig,
+  Eye,
 } from "lucide-react";
 import CustomPagination from "../../components/CustomPagination";
 import DeleteDialog from "../../components/DeleteDialog";
@@ -61,6 +62,7 @@ async function withTimeout<T>(
 
 interface PaymentListProps {
   payments: Payment[];
+  onView: (paymentId: string) => void;
   onEdit: (paymentId: string) => void;
   onDelete: (paymentId: string) => void;
   fetchPayments: () => Promise<void>;
@@ -101,6 +103,7 @@ const SkeletonRow: React.FC<{ rowsPerPage: number }> = ({ rowsPerPage }) => (
 
 const PaymentList: React.FC<PaymentListProps> = ({
   payments,
+  onView,
   onEdit,
   onDelete,
 }) => {
@@ -153,8 +156,14 @@ const PaymentList: React.FC<PaymentListProps> = ({
           { data: clientData, error: clientError },
           { data: taskData, error: taskError },
         ] = await Promise.all([
-          withTimeout(supabase.from("clients").select("id, name").eq("is_deleted", false), 5000),
-          withTimeout(supabase.from("tasks").select("id, title").eq("is_deleted", false), 5000),
+          withTimeout(
+            supabase.from("clients").select("id, name").eq("is_deleted", false),
+            5000
+          ),
+          withTimeout(
+            supabase.from("tasks").select("id, title").eq("is_deleted", false),
+            5000
+          ),
         ]);
         if (clientError) throw new Error(`Clients: ${clientError.message}`);
         if (taskError) throw new Error(`Tasks: ${taskError.message}`);
@@ -251,7 +260,10 @@ const PaymentList: React.FC<PaymentListProps> = ({
     try {
       // Optimistic update
       onDelete(paymentToDelete);
-      const { error } = await supabase.from("payments").update({is_deleted: 'TRUE'}).eq("id", paymentToDelete);
+      const { error } = await supabase
+        .from("payments")
+        .update({ is_deleted: "TRUE" })
+        .eq("id", paymentToDelete);
       if (error) throw error;
       toast.success("Payment deleted");
     } catch (error: any) {
@@ -265,16 +277,27 @@ const PaymentList: React.FC<PaymentListProps> = ({
   }, [paymentToDelete, debouncedSetDeleteDialogOpen, onDelete]);
 
   const handleCheckout = (payment: Payment) => {
-    fetch(`${import.meta.env.VITE_BACKEND_URL}/api/payments/create-checkout-session`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        items: [{ name: "Anthem InfoTech Pvt Ltd", price: payment.amount, quantity: 1 }],
-        paymentId: payment.id,
-      }),
-    })
+    fetch(
+      `${
+        import.meta.env.VITE_BACKEND_URL
+      }/api/payments/create-checkout-session`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          items: [
+            {
+              name: "Anthem InfoTech Pvt Ltd",
+              price: payment.amount,
+              quantity: 1,
+            },
+          ],
+          paymentId: payment.id,
+        }),
+      }
+    )
       .then((res) => {
         if (res.ok) return res.json();
         return res.json().then((json) => Promise.reject(json));
@@ -284,11 +307,17 @@ const PaymentList: React.FC<PaymentListProps> = ({
       })
       .catch((e) => {
         console.error(e.error);
-         toast.error("Checkout failed");
+        toast.error("Checkout failed");
       });
   };
 
   if (isLoading) return <SkeletonRow rowsPerPage={rowsPerPage} />;
+
+  const showPaymentOptionColumn =
+    !isAdmin &&
+    paginatedPayments.some((payment) =>
+      ["invoiced", "pending", "overdue"].includes(payment.status)
+    );
 
   return (
     <div>
@@ -301,7 +330,11 @@ const PaymentList: React.FC<PaymentListProps> = ({
             <TableHead>Due Date</TableHead>
             <TableHead>Invoice #</TableHead>
             <TableHead>Status</TableHead>
-            {isAdmin ? null : <TableHead>Payment option</TableHead>}
+            {isAdmin
+              ? null
+              : showPaymentOptionColumn && (
+                  <TableHead>Payment option</TableHead>
+                )}
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -334,21 +367,21 @@ const PaymentList: React.FC<PaymentListProps> = ({
                       payment.status.slice(1)}
                   </Badge>
                 </TableCell>
-                {isAdmin ? null : (
+                {!isAdmin && showPaymentOptionColumn && (
                   <TableCell>
                     {["invoiced", "pending", "overdue"].includes(
                       payment.status
-                    ) && (
+                    ) ? (
                       <Button
                         variant="outline"
                         size="sm"
                         className="gap-1"
-                        onClick={()=>handleCheckout(payment)}
+                        onClick={() => handleCheckout(payment)}
                         disabled={isProcessing}
                       >
                         <CreditCard className="h-3 w-3" /> Pay Now
                       </Button>
-                    )}
+                    ) : null}
                   </TableCell>
                 )}
 
@@ -366,6 +399,12 @@ const PaymentList: React.FC<PaymentListProps> = ({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
+                          onClick={() => onView(payment.id)}
+                          disabled={isProcessing}
+                        >
+                          <Eye className="mr-2 h-4 w-4" /> view details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           onClick={() => onEdit(payment.id)}
                           disabled={isProcessing}
                         >
@@ -381,20 +420,26 @@ const PaymentList: React.FC<PaymentListProps> = ({
                       </DropdownMenuContent>
                     </DropdownMenu>
                   ) : (
-                    ["invoiced", "pending", "overdue"].includes(
-                      payment.status
-                    ) && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={isProcessing}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={isProcessing}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => onView(payment.id)}
+                          disabled={isProcessing}
+                        >
+                          <Eye className="mr-2 h-4 w-4" /> view details
+                        </DropdownMenuItem>
+                        {["invoiced", "pending", "overdue"].includes(
+                          payment.status
+                        ) && (
                           <DropdownMenuItem
                             className="text-green-500"
                             disabled={isProcessing}
@@ -403,9 +448,9 @@ const PaymentList: React.FC<PaymentListProps> = ({
                             <CircleCheckBig className="mr-2 h-4 w-4" /> Mark as
                             paid
                           </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </TableCell>
               </TableRow>
