@@ -25,3 +25,4 @@ dist-ssr
 *.sw?
 
 supabase/supabaseClient.jsx
+config.bat
