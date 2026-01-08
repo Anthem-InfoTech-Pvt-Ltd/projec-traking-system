@@ -93,6 +93,6 @@ The system ensures **transparent project progress tracking**, **secure payments*
 
 ---
 
-## 🏢 Developed For
+## 🏢 Maintained By
 
 Anthem Infotech Pvt. Ltd.
